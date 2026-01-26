@@ -4,7 +4,7 @@
  */
 
 //% weight=1070 color=#4D68EC icon="\uf0e7" block="04. Adv Sensors"
-//% groups="['실시간(RTC)', '대기압(BMP280)', '대기압(BME280)', '6축 가속도(MPU6050)', '3축 가속도(ADXL345)', '색상감지(TCS34725)', '제스처(APDS9960)', '심박(MAX30102)', 'Fingerprint', '전류/전압/전력 측정(INA219)', '전류 센서(ACS712)', '전압센서(Voltage Sensor)', 'Other']"
+//% groups="['실시간(RTC)', '대기압(BMP280)', '6축 가속도(MPU6050)', 'CO2센서(SGP30)', '거리센서(VL53L0X)', '온습도(I2C-SHT30)', '색상감지(TCS34725)', '제스처(APDS9960)', '심박(MAX30102)', '조도(BH1750)', '조도(TSL2561)', '3축 가속도(ADXL345)', '대기압(BME280)', 'Fingerprint', '전류/전압/전력 측정(INA219)', '전류 센서(ACS712)', '전압센서(Voltage Sensor)', 'Other']"
 namespace AdvSensors {
 
 
@@ -1777,5 +1777,268 @@ namespace AdvSensors {
     //% group="Other" weight=48
     export function tiltSensorRead(pin: DigitalPin): boolean {
         return pins.digitalReadPin(pin) == 1
+    }
+
+
+    /********** VL53L0X 레이저 거리 센서 **********/
+
+    // VL53L0X 측정 모드
+    export enum VL53L0XMode {
+        //% block="Single (eSingle)"
+        Single = 0,
+        //% block="Continuous (eContinuous)"
+        Continuous = 1
+    }
+
+    // VL53L0X 정밀도
+    export enum VL53L0XPrecision {
+        //% block="High precision (eHigh)"
+        High = 0,
+        //% block="Low precision (eLow)"
+        Low = 1
+    }
+
+    // VL53L0X 제어
+    export enum VL53L0XControl {
+        //% block="Start"
+        Start = 0,
+        //% block="Stop"
+        Stop = 1
+    }
+
+    // VL53L0X 읽기 타입
+    export enum VL53L0XReadType {
+        //% block="Distance (mm)"
+        Distance = 0,
+        //% block="Ambient (Lux)"
+        Ambient = 1
+    }
+
+    // VL53L0X 데이터 저장 변수
+    let _vl53l0xAddr: number = 0x29
+    let _vl53l0xDistance: number = 0
+    let _vl53l0xAmbient: number = 0
+    let _vl53l0xMode: VL53L0XMode = VL53L0XMode.Single
+    let _vl53l0xPrecision: VL53L0XPrecision = VL53L0XPrecision.High
+
+    //% block="VL53L0X init I2C address %addr"
+    //% addr.defl=41
+    //% group="거리센서(VL53L0X)" weight=89
+    export function vl53l0xInit(addr: number): void {
+        _vl53l0xAddr = addr
+    }
+
+    //% block="VL53L0X set mode | mode %mode | precision %precision"
+    //% group="거리센서(VL53L0X)" weight=88
+    export function vl53l0xSetMode(mode: VL53L0XMode, precision: VL53L0XPrecision): void {
+        _vl53l0xMode = mode
+        _vl53l0xPrecision = precision
+
+        // 정밀도에 따른 타이밍 설정
+        let timingBudget = _vl53l0xPrecision == VL53L0XPrecision.High ? 200000 : 20000
+
+        // I2C로 설정 전송
+        pins.i2cWriteNumber(_vl53l0xAddr, 0x01, NumberFormat.UInt8BE)
+    }
+
+    //% block="VL53L0X control %control"
+    //% group="거리센서(VL53L0X)" weight=87
+    export function vl53l0xControl(control: VL53L0XControl): void {
+        if (control == VL53L0XControl.Start) {
+            // 측정 시작 명령
+            pins.i2cWriteNumber(_vl53l0xAddr, 0x00, NumberFormat.UInt8BE)
+
+            // 측정 대기
+            basic.pause(_vl53l0xPrecision == VL53L0XPrecision.High ? 200 : 20)
+
+            // 결과 읽기 (간소화된 구현)
+            let buf = pins.i2cReadBuffer(_vl53l0xAddr, 2)
+            _vl53l0xDistance = (buf[0] << 8) | buf[1]
+        }
+    }
+
+    //% block="VL53L0X read %readType"
+    //% group="거리센서(VL53L0X)" weight=86
+    export function vl53l0xRead(readType: VL53L0XReadType): number {
+        if (readType == VL53L0XReadType.Distance) {
+            return _vl53l0xDistance
+        }
+        return _vl53l0xAmbient
+    }
+
+
+    /********** SHT30 센서 **********/
+
+    // 온도 단위
+    export enum TempUnit {
+        //% block="Celsius (°C)"
+        Celsius = 0,
+        //% block="Fahrenheit (°F)"
+        Fahrenheit = 1
+    }
+
+    // SHT30 데이터 저장 변수
+    let _sht30Temperature: number = 0
+    let _sht30Humidity: number = 0
+    let _sht30Addr: number = 0x44
+
+    //% block="SHT30 init address %addr"
+    //% addr.defl=0x44
+    //% group="온습도(I2C-SHT30)" weight=96
+    export function sht30Init(addr: number): void {
+        _sht30Addr = addr
+    }
+
+    //% block="SHT30 start measurement"
+    //% group="온습도(I2C-SHT30)" weight=95
+    export function sht30Query(): void {
+        // 측정 명령 전송 (Single Shot, High Repeatability)
+        pins.i2cWriteNumber(_sht30Addr, 0x2400, NumberFormat.UInt16BE)
+
+        // 측정 대기 (15ms)
+        basic.pause(15)
+
+        // 6바이트 읽기 (온도2 + CRC + 습도2 + CRC)
+        let buf = pins.i2cReadBuffer(_sht30Addr, 6)
+
+        // 온도 계산
+        let tempRaw = (buf[0] << 8) | buf[1]
+        _sht30Temperature = -45 + (175 * tempRaw / 65535)
+
+        // 습도 계산
+        let humRaw = (buf[3] << 8) | buf[4]
+        _sht30Humidity = 100 * humRaw / 65535
+    }
+
+    //% block="SHT30 read temperature (unit %unit)"
+    //% group="온습도(I2C-SHT30)" weight=94
+    export function sht30ReadTemp(unit: TempUnit): number {
+        if (unit == TempUnit.Fahrenheit) {
+            return _sht30Temperature * 9 / 5 + 32
+        }
+        return _sht30Temperature
+    }
+
+    //% block="SHT30 read humidity"
+    //% group="온습도(I2C-SHT30)" weight=93
+    export function sht30ReadHumidity(): number {
+        return _sht30Humidity
+    }
+
+
+    /********** SGP30 TVOC 센서 **********/
+
+    // SGP30 측정 타입
+    export enum SGP30Type {
+        //% block="eCO2(ppm)"
+        eCO2 = 0,
+        //% block="TVOC(ppb)"
+        TVOC = 1
+    }
+
+    // SGP30 데이터 저장 변수
+    let _sgp30Addr: number = 0x58
+    let _sgp30eCO2: number = 0
+    let _sgp30TVOC: number = 0
+
+    //% block="SGP30 init"
+    //% group="CO2센서(SGP30)" weight=46
+    export function sgp30Init(): void {
+        // IAQ 초기화 명령
+        pins.i2cWriteNumber(_sgp30Addr, 0x2003, NumberFormat.UInt16BE)
+        basic.pause(10)
+    }
+
+    //% block="SGP30 measure run"
+    //% group="CO2센서(SGP30)" weight=45
+    export function sgp30Measure(): void {
+        // IAQ 측정 명령
+        pins.i2cWriteNumber(_sgp30Addr, 0x2008, NumberFormat.UInt16BE)
+        basic.pause(12)
+
+        // 결과 읽기 (6바이트: eCO2 + CRC + TVOC + CRC)
+        let buf = pins.i2cReadBuffer(_sgp30Addr, 6)
+
+        _sgp30eCO2 = (buf[0] << 8) | buf[1]
+        _sgp30TVOC = (buf[3] << 8) | buf[4]
+    }
+
+    //% block="SGP30 read %stype"
+    //% group="CO2센서(SGP30)" weight=44
+    export function sgp30Read(stype: SGP30Type): number {
+        if (stype == SGP30Type.eCO2) {
+            return _sgp30eCO2
+        }
+        return _sgp30TVOC
+    }
+
+
+    /********** BH1750 조도 센서 **********/
+
+    // BH1750 데이터 저장 변수
+    let _bh1750Addr: number = 0x23
+
+    //% block="BH1750 init address %addr"
+    //% addr.defl=0x23
+    //% group="조도(BH1750)" weight=80
+    export function bh1750Init(addr: number): void {
+        _bh1750Addr = addr
+        // Power On
+        pins.i2cWriteNumber(_bh1750Addr, 0x01, NumberFormat.UInt8BE)
+        // 연속 고해상도 모드 (1 lux)
+        pins.i2cWriteNumber(_bh1750Addr, 0x10, NumberFormat.UInt8BE)
+        basic.pause(180)
+    }
+
+    //% block="BH1750 light intensity read (lux)"
+    //% group="조도(BH1750)" weight=79
+    export function bh1750Read(): number {
+        let buf = pins.i2cReadBuffer(_bh1750Addr, 2)
+        let raw = (buf[0] << 8) | buf[1]
+        return Math.floor(raw / 1.2)
+    }
+
+
+    /********** TSL2561 조도 센서 **********/
+
+    // TSL2561 데이터 저장 변수
+    let _tsl2561Addr: number = 0x39
+
+    //% block="TSL2561 init address %addr"
+    //% addr.defl=0x39
+    //% group="조도(TSL2561)" weight=77
+    export function tsl2561Init(addr: number): void {
+        _tsl2561Addr = addr
+        // Power On (Command + Control Register)
+        pins.i2cWriteNumber(_tsl2561Addr, 0x80, NumberFormat.UInt8BE)
+        pins.i2cWriteNumber(_tsl2561Addr, 0x03, NumberFormat.UInt8BE)
+        basic.pause(400)
+    }
+
+    //% block="TSL2561 light intensity read (lux)"
+    //% group="조도(TSL2561)" weight=76
+    export function tsl2561Read(): number {
+        // CH0 읽기 (Command + Word + CH0 Data)
+        pins.i2cWriteNumber(_tsl2561Addr, 0xAC, NumberFormat.UInt8BE)
+        let ch0 = pins.i2cReadNumber(_tsl2561Addr, NumberFormat.UInt16LE)
+
+        // CH1 읽기 (Command + Word + CH1 Data)
+        pins.i2cWriteNumber(_tsl2561Addr, 0xAE, NumberFormat.UInt8BE)
+        let ch1 = pins.i2cReadNumber(_tsl2561Addr, NumberFormat.UInt16LE)
+
+        // 간단한 Lux 계산
+        if (ch0 == 0) return 0
+        let ratio = ch1 / ch0
+        let lux = 0
+        if (ratio <= 0.5) {
+            lux = 0.0304 * ch0 - 0.062 * ch0 * Math.pow(ratio, 1.4)
+        } else if (ratio <= 0.61) {
+            lux = 0.0224 * ch0 - 0.031 * ch1
+        } else if (ratio <= 0.80) {
+            lux = 0.0128 * ch0 - 0.0153 * ch1
+        } else if (ratio <= 1.30) {
+            lux = 0.00146 * ch0 - 0.00112 * ch1
+        }
+        return Math.floor(lux)
     }
 }
