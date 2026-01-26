@@ -42,13 +42,13 @@ namespace Sensors03 {
     let _dhtTempUnit: TempUnit = TempUnit.Celsius
 
     //% block="Last query successful?"
-    //% group="온습도(DHT11/DHT22)" weight=110
+    //% group="온습도(DHT11/DHT22)" weight=225
     export function dhtLastQuerySuccessful(): boolean {
         return _dhtLastQuery
     }
 
     //% block="Read %readType"
-    //% group="온습도(DHT11/DHT22)" weight=109
+    //% group="온습도(DHT11/DHT22)" weight=224
     export function dhtRead(readType: DHTReadType): number {
         if (readType == DHTReadType.Temperature) {
             if (_dhtTempUnit == TempUnit.Fahrenheit) {
@@ -64,7 +64,7 @@ namespace Sensors03 {
     //% pullUp.shadow="toggleYesNo" pullUp.defl=true
     //% serialOut.shadow="toggleYesNo" serialOut.defl=false
     //% wait.shadow="toggleYesNo" wait.defl=true
-    //% group="온습도(DHT11/DHT22)" weight=108
+    //% group="온습도(DHT11/DHT22)" weight=223
     //% inlineInputMode=inline
     export function dhtQuery(dhtType: DHTType, pin: DigitalPin, pullUp: boolean, serialOut: boolean, wait: boolean): void {
         _dhtLastQuery = false
@@ -132,13 +132,13 @@ namespace Sensors03 {
     }
 
     //% block="Last query sensor responding?"
-    //% group="온습도(DHT11/DHT22)" weight=107
+    //% group="온습도(DHT11/DHT22)" weight=222
     export function dhtSensorResponding(): boolean {
         return _dhtSensorResponding
     }
 
     //% block="Temperature type: %unit"
-    //% group="온습도(DHT11/DHT22)" weight=106
+    //% group="온습도(DHT11/DHT22)" weight=221
     export function dhtSetTempUnit(unit: TempUnit): void {
         _dhtTempUnit = unit
     }
@@ -160,13 +160,13 @@ namespace Sensors03 {
     let _ds18b20Count: number = 0
 
     //% block="DS18B20 set data pin %pin"
-    //% group="물온도(DS18B20)" weight=104
+    //% group="물온도(DS18B20)" weight=215
     export function ds18b20SetPin(pin: DigitalPin): void {
         _ds18b20Pin = pin
     }
 
     //% block="DS18B20 start conversion"
-    //% group="물온도(DS18B20)" weight=103
+    //% group="물온도(DS18B20)" weight=214
     export function ds18b20StartConversion(): void {
         // 1-Wire 리셋
         pins.digitalWritePin(_ds18b20Pin, 0)
@@ -193,7 +193,7 @@ namespace Sensors03 {
 
     //% block="DS18B20 read sensor %index temperature (unit %unit)"
     //% index.min=0 index.max=7 index.defl=0
-    //% group="물온도(DS18B20)" weight=102
+    //% group="물온도(DS18B20)" weight=213
     export function ds18b20ReadTemp(index: number, unit: DS18B20Unit): number {
         // 1-Wire 리셋
         pins.digitalWritePin(_ds18b20Pin, 0)
@@ -227,7 +227,7 @@ namespace Sensors03 {
     }
 
     //% block="DS18B20 connected sensor count"
-    //% group="물온도(DS18B20)" weight=101
+    //% group="물온도(DS18B20)" weight=212
     export function ds18b20GetCount(): number {
         return _ds18b20Count
     }
@@ -271,7 +271,7 @@ namespace Sensors03 {
     /********** LM35 센서 **********/
 
     //% block="LM35 read temperature pin %pin unit %unit"
-    //% group="온도(LM35)" weight=97
+    //% group="온도(LM35)" weight=125
     export function lm35Read(pin: AnalogPin, unit: TempUnit): number {
         let tempC = pins.analogReadPin(pin) * 0.48828125
         if (unit == TempUnit.Fahrenheit) {
@@ -297,14 +297,14 @@ namespace Sensors03 {
 
     //% block="HC-SR04 set trigger pin %trig echo pin %echo"
     //% trig.defl=DigitalPin.P7 echo.defl=DigitalPin.P8
-    //% group="초음파(HC-SR04)" weight=92
+    //% group="초음파(HC-SR04)" weight=230
     export function hcsr04SetPins(trig: DigitalPin, echo: DigitalPin): void {
         _hcsr04Trig = trig
         _hcsr04Echo = echo
     }
 
     //% block="HC-SR04 read distance unit %unit"
-    //% group="초음파(HC-SR04)" weight=91
+    //% group="초음파(HC-SR04)" weight=229
     export function hcsr04Read(unit: DistanceUnit): number {
         pins.digitalWritePin(_hcsr04Trig, 0)
         control.waitMicros(2)
@@ -324,7 +324,7 @@ namespace Sensors03 {
     /********** GP2Y0A21YK 적외선 거리 센서 **********/
 
     //% block="GP2Y0A21YK read distance pin %pin unit %unit"
-    //% group="미세먼지(GP2Y0A21YK)" weight=85
+    //% group="미세먼지(GP2Y0A21YK)" weight=120
     export function gp2y0a21ykRead(pin: AnalogPin, unit: DistanceUnit): number {
         let v = pins.analogReadPin(pin)
         let cm = Math.floor(12343.85 / (v - 0.42))
@@ -343,14 +343,14 @@ namespace Sensors03 {
 
     //% block="US-100 set trigger pin %trig echo pin %echo"
     //% trig.defl=DigitalPin.P1 echo.defl=DigitalPin.P2
-    //% group="초음파(US-100)" weight=84
+    //% group="초음파(US-100)" weight=115
     export function us100SetPins(trig: DigitalPin, echo: DigitalPin): void {
         _us100Trig = trig
         _us100Echo = echo
     }
 
     //% block="US-100 distance measure unit %unit"
-    //% group="초음파(US-100)" weight=83
+    //% group="초음파(US-100)" weight=114
     export function us100Read(unit: DistanceUnit): number {
         pins.digitalWritePin(_us100Trig, 0)
         control.waitMicros(2)
@@ -370,7 +370,7 @@ namespace Sensors03 {
     /********** TEMT6000 조도 센서 **********/
 
     //% block="TEMT6000 light intensity read pin %pin"
-    //% group="빛(TEMT6000)" weight=78
+    //% group="빛(TEMT6000)" weight=110
     export function temt6000Read(pin: AnalogPin): number {
         return pins.analogReadPin(pin)
     }
@@ -406,7 +406,7 @@ namespace Sensors03 {
 
     //% block="UV sensor setup: analog pin %pin"
     //% pin.defl=AnalogPin.P0
-    //% group="UV Sensor" weight=69
+    //% group="UV Sensor" weight=135
     export function uvInit(pin: AnalogPin): void {
         _uvPin = pin
         _uvRefVoltage = 3300
@@ -416,7 +416,7 @@ namespace Sensors03 {
     //% block="UV sensor calibrate %calType, ref voltage: %voltage mV"
     //% calType.defl=UVCalibration.Indoor
     //% voltage.defl=990 voltage.min=0 voltage.max=3300
-    //% group="UV Sensor" weight=68
+    //% group="UV Sensor" weight=134
     //% inlineInputMode=inline
     export function uvCalibrate(calType: UVCalibration, voltage: number): void {
         if (calType == UVCalibration.Indoor) {
@@ -437,7 +437,7 @@ namespace Sensors03 {
 
     //% block="UV sensor read: %dtype"
     //% dtype.defl=UVDataType.UVIndex
-    //% group="UV Sensor" weight=67
+    //% group="UV Sensor" weight=133
     export function uvRead(dtype: UVDataType): number {
         // 아날로그 값 읽기 (여러 번 읽어서 평균)
         let analogSum = 0
@@ -476,7 +476,7 @@ namespace Sensors03 {
     /********** MQ-2 가스 센서 **********/
 
     //% block="MQ-2 gas concentration read pin %pin"
-    //% group="가스(MQ-2)" weight=50
+    //% group="가스(MQ-2)" weight=105
     export function mq2Read(pin: AnalogPin): number {
         return pins.analogReadPin(pin)
     }
@@ -485,7 +485,7 @@ namespace Sensors03 {
     /********** MQ-135 공기질 센서 **********/
 
     //% block="MQ-135 air quality read pin %pin"
-    //% group="가스(MQ-135)" weight=49
+    //% group="가스(MQ-135)" weight=100
     export function mq135Read(pin: AnalogPin): number {
         return pins.analogReadPin(pin)
     }
@@ -507,7 +507,7 @@ namespace Sensors03 {
     let _ccs811TVOC: number = 0
 
     //% block="CCS811 init"
-    //% group="CO2센서(CCS811)" weight=48
+    //% group="CO2센서(CCS811)" weight=95
     export function ccs811Init(): void {
         // 앱 시작 명령
         pins.i2cWriteNumber(_ccs811Addr, 0xF4, NumberFormat.UInt8BE)
@@ -518,7 +518,7 @@ namespace Sensors03 {
     }
 
     //% block="CCS811 read %ctype"
-    //% group="CO2센서(CCS811)" weight=47
+    //% group="CO2센서(CCS811)" weight=94
     export function ccs811Read(ctype: CCS811Type): number {
         // 결과 레지스터 읽기
         pins.i2cWriteNumber(_ccs811Addr, 0x02, NumberFormat.UInt8BE)
@@ -591,7 +591,7 @@ namespace Sensors03 {
     //% rx.defl=SerialPin.P2
     //% tx.defl=SerialPin.P1
     //% baud.defl=9600
-    //% group="미세먼지(PMS)" weight=50
+    //% group="미세먼지(PMS)" weight=185
     //% inlineInputMode=inline
     export function pmsInit(serialType: PMSSerial, rx: SerialPin, tx: SerialPin, baud: number): void {
         _pmsRx = rx
@@ -604,7 +604,7 @@ namespace Sensors03 {
 
     //% block="PMS PM sensor power %power"
     //% power.defl=PMSPower.Wakeup
-    //% group="미세먼지(PMS)" weight=49
+    //% group="미세먼지(PMS)" weight=184
     export function pmsPower(power: PMSPower): void {
         if (power == PMSPower.Sleep) {
             // 슬립 명령: 42 4D E4 00 00 01 73
@@ -634,7 +634,7 @@ namespace Sensors03 {
 
     //% block="PMS PM sensor mode %mode"
     //% mode.defl=PMSMode.Active
-    //% group="미세먼지(PMS)" weight=48
+    //% group="미세먼지(PMS)" weight=183
     export function pmsSetMode(mode: PMSMode): void {
         if (mode == PMSMode.Passive) {
             // 패시브 모드: 42 4D E1 00 00 01 70
@@ -663,14 +663,14 @@ namespace Sensors03 {
 
     //% block="PMS PM sensor read %dtype"
     //% dtype.defl=PMSDataType.PM2_5_STD
-    //% group="미세먼지(PMS)" weight=47
+    //% group="미세먼지(PMS)" weight=182
     export function pmsRead(dtype: PMSDataType): number {
         pmsParseData()
         return _pmsData[dtype]
     }
 
     //% block="PMS PM sensor request read"
-    //% group="미세먼지(PMS)" weight=46
+    //% group="미세먼지(PMS)" weight=181
     export function pmsRequestRead(): void {
         // 수동 읽기 요청: 42 4D E2 00 00 01 71
         let cmd = pins.createBuffer(7)
@@ -685,7 +685,7 @@ namespace Sensors03 {
     }
 
     //% block="PMS PM sensor data ready"
-    //% group="미세먼지(PMS)" weight=45
+    //% group="미세먼지(PMS)" weight=180
     export function pmsDataReady(): boolean {
         pmsParseData()
         return _pmsReady
@@ -811,7 +811,7 @@ namespace Sensors03 {
     //% rx.defl=SerialPin.P2
     //% tx.defl=SerialPin.P1
     //% baud.defl=9600
-    //% group="CO2센서(MHZ19)" weight=38
+    //% group="CO2센서(MHZ19)" weight=175
     //% inlineInputMode=inline
     export function mhz19Init(serialType: MHZ19Serial, rx: SerialPin, tx: SerialPin, baud: number): void {
         _mhz19Rx = rx
@@ -822,7 +822,7 @@ namespace Sensors03 {
 
     //% block="MHZ19 set range: %range ppm"
     //% range.defl=MHZ19Range.Range2000
-    //% group="CO2센서(MHZ19)" weight=37
+    //% group="CO2센서(MHZ19)" weight=174
     export function mhz19SetRange(range: MHZ19Range): void {
         _mhz19Range = range
         // 범위 설정 명령: FF 01 99 00 00 00 [범위H] [범위L] [체크섬]
@@ -843,7 +843,7 @@ namespace Sensors03 {
     //% block="MHZ19 filter mode %filter, type %filterType"
     //% filter.defl=MHZ19Filter.On
     //% filterType.defl=MHZ19FilterType.Clear
-    //% group="CO2센서(MHZ19)" weight=36
+    //% group="CO2센서(MHZ19)" weight=173
     //% inlineInputMode=inline
     export function mhz19SetFilter(filter: MHZ19Filter, filterType: MHZ19FilterType): void {
         // 필터 설정은 소프트웨어적으로 처리 (MHZ19B에서는 직접 지원 안함)
@@ -852,7 +852,7 @@ namespace Sensors03 {
 
     //% block="MHZ19 read: %dtype"
     //% dtype.defl=MHZ19DataType.CO2
-    //% group="CO2센서(MHZ19)" weight=35
+    //% group="CO2센서(MHZ19)" weight=172
     export function mhz19Read(dtype: MHZ19DataType): number {
         // CO2 읽기 명령: FF 01 86 00 00 00 00 00 79
         let cmd = pins.createBuffer(9)
@@ -889,7 +889,7 @@ namespace Sensors03 {
     //% block="MHZ19 %autoCal period(hour): %hours"
     //% autoCal.defl=MHZ19AutoCal.On
     //% hours.defl=24 hours.min=0 hours.max=720
-    //% group="CO2센서(MHZ19)" weight=34
+    //% group="CO2센서(MHZ19)" weight=171
     //% inlineInputMode=inline
     export function mhz19SetAutoCal(autoCal: MHZ19AutoCal, hours: number): void {
         _mhz19AutoCal = (autoCal == MHZ19AutoCal.On)
@@ -911,7 +911,7 @@ namespace Sensors03 {
 
     //% block="MHZ19 status read: %status"
     //% status.defl=MHZ19Status.Range
-    //% group="CO2센서(MHZ19)" weight=33
+    //% group="CO2센서(MHZ19)" weight=170
     export function mhz19GetStatus(status: MHZ19Status): number {
         if (status == MHZ19Status.Range) {
             return _mhz19Range
@@ -963,7 +963,7 @@ namespace Sensors03 {
     //% dout.defl=DigitalPin.P0
     //% clk.defl=DigitalPin.P1
     //% gain.defl=HX711Gain.Gain128
-    //% group="무게(HX711)" weight=43
+    //% group="무게(HX711)" weight=205
     //% inlineInputMode=inline
     export function hx711Init(dout: DigitalPin, clk: DigitalPin, gain: HX711Gain): void {
         _hx711Dout = dout
@@ -980,7 +980,7 @@ namespace Sensors03 {
     }
 
     //% block="HX711 weight sensor read weight"
-    //% group="무게(HX711)" weight=42
+    //% group="무게(HX711)" weight=204
     export function hx711ReadWeight(): number {
         let raw = hx711ReadRaw()
         return (raw - _hx711Offset) / _hx711Scale
@@ -988,7 +988,7 @@ namespace Sensors03 {
 
     //% block="HX711 weight sensor tare %times times"
     //% times.defl=10 times.min=1 times.max=50
-    //% group="무게(HX711)" weight=41
+    //% group="무게(HX711)" weight=203
     export function hx711Tare(times: number): void {
         let sum = 0
         for (let i = 0; i < times; i++) {
@@ -1000,7 +1000,7 @@ namespace Sensors03 {
 
     //% block="HX711 weight sensor set scale %scale"
     //% scale.defl=1
-    //% group="무게(HX711)" weight=40
+    //% group="무게(HX711)" weight=202
     export function hx711SetScale(scale: number): void {
         if (scale != 0) {
             _hx711Scale = scale
@@ -1008,14 +1008,14 @@ namespace Sensors03 {
     }
 
     //% block="HX711 weight sensor is ready"
-    //% group="무게(HX711)" weight=39
+    //% group="무게(HX711)" weight=201
     export function hx711IsReady(): boolean {
         return pins.digitalReadPin(_hx711Dout) == 0
     }
 
     //% block="HX711 weight sensor power %state"
     //% state.shadow="toggleOnOff"
-    //% group="무게(HX711)" weight=38
+    //% group="무게(HX711)" weight=200
     export function hx711Power(state: boolean): void {
         if (state) {
             // 전원 켜기
@@ -1029,7 +1029,7 @@ namespace Sensors03 {
 
     //% block="HX711 weight sensor read %dtype"
     //% dtype.defl=HX711DataType.Weight
-    //% group="무게(HX711)" weight=37
+    //% group="무게(HX711)" weight=199
     export function hx711Read(dtype: HX711DataType): number {
         if (dtype == HX711DataType.Raw) {
             return hx711ReadRaw()
@@ -1112,7 +1112,7 @@ namespace Sensors03 {
 
     //% block="TDS sensor(GravityTDS) setup: pin %pin"
     //% pin.defl=AnalogPin.P0
-    //% group="전기전도도(TDS)" weight=32
+    //% group="전기전도도(TDS)" weight=165
     export function tdsInit(pin: AnalogPin): void {
         _tdsPin = pin
         _tdsTemperature = 25
@@ -1123,13 +1123,13 @@ namespace Sensors03 {
 
     //% block="TDS sensor temp compensation: %temperature °C"
     //% temperature.defl=25 temperature.min=0 temperature.max=50
-    //% group="전기전도도(TDS)" weight=31
+    //% group="전기전도도(TDS)" weight=164
     export function tdsSetTemperature(temperature: number): void {
         _tdsTemperature = temperature
     }
 
     //% block="TDS sensor update"
-    //% group="전기전도도(TDS)" weight=30
+    //% group="전기전도도(TDS)" weight=163
     export function tdsUpdate(): void {
         // 아날로그 값 읽기 (여러 번 읽어서 평균)
         let analogSum = 0
@@ -1162,7 +1162,7 @@ namespace Sensors03 {
 
     //% block="TDS sensor read: %dtype"
     //% dtype.defl=TDSDataType.TDS
-    //% group="전기전도도(TDS)" weight=29
+    //% group="전기전도도(TDS)" weight=162
     export function tdsRead(dtype: TDSDataType): number {
         if (dtype == TDSDataType.TDS) {
             return Math.round(_tdsTDSValue)
@@ -1175,7 +1175,7 @@ namespace Sensors03 {
     //% block="TDS sensor advanced %setting value: %value"
     //% setting.defl=TDSAdvanced.RefVoltage
     //% value.defl=3.3
-    //% group="전기전도도(TDS)" weight=28
+    //% group="전기전도도(TDS)" weight=161
     //% inlineInputMode=inline
     export function tdsSetAdvanced(setting: TDSAdvanced, value: number): void {
         if (setting == TDSAdvanced.RefVoltage) {
@@ -1217,7 +1217,7 @@ namespace Sensors03 {
 
     //% block="pH sensor setup pin %pin"
     //% pin.defl=AnalogPin.P0
-    //% group="pH" weight=27
+    //% group="pH" weight=155
     export function phInit(pin: AnalogPin): void {
         _phPin = pin
         _phRefVoltage = 3.3
@@ -1229,7 +1229,7 @@ namespace Sensors03 {
 
     //% block="pH read at %temperature °C"
     //% temperature.defl=25 temperature.min=0 temperature.max=50
-    //% group="pH" weight=26
+    //% group="pH" weight=154
     export function phRead(temperature: number): number {
         // 아날로그 값 읽기 (여러 번 읽어서 평균)
         let analogSum = 0
@@ -1259,7 +1259,7 @@ namespace Sensors03 {
     }
 
     //% block="pH sensor read voltage"
-    //% group="pH" weight=25
+    //% group="pH" weight=153
     export function phReadVoltage(): number {
         // 아날로그 값 읽기 (여러 번 읽어서 평균)
         let analogSum = 0
@@ -1276,7 +1276,7 @@ namespace Sensors03 {
 
     //% block="pH calibration %cmd"
     //% cmd.defl=PHCalibration.EnterCal
-    //% group="pH" weight=24
+    //% group="pH" weight=152
     export function phCalibrate(cmd: PHCalibration): void {
         let currentVoltage = phReadVoltage()
 
@@ -1318,7 +1318,7 @@ namespace Sensors03 {
 
     //% block="Turbidity sensor setup: analog pin %pin"
     //% pin.defl=AnalogPin.P0
-    //% group="탁도(Turbidity)" weight=23
+    //% group="탁도(Turbidity)" weight=145
     export function turbidityInit(pin: AnalogPin): void {
         _turbidityPin = pin
         _turbidityRefVoltage = 3.3
@@ -1326,7 +1326,7 @@ namespace Sensors03 {
     }
 
     //% block="Turbidity sensor calibrate (clear water)"
-    //% group="탁도(Turbidity)" weight=22
+    //% group="탁도(Turbidity)" weight=144
     export function turbidityCalibrate(): void {
         // 맑은 물에서 전압 측정하여 보정값 저장
         let analogSum = 0
@@ -1339,7 +1339,7 @@ namespace Sensors03 {
     }
 
     //% block="Turbidity sensor update"
-    //% group="탁도(Turbidity)" weight=21
+    //% group="탁도(Turbidity)" weight=143
     export function turbidityUpdate(): void {
         // 값 읽기는 turbidityRead에서 직접 수행
         // 이 블록은 호환성을 위해 제공
@@ -1347,7 +1347,7 @@ namespace Sensors03 {
 
     //% block="Turbidity sensor read: %dtype"
     //% dtype.defl=TurbidityDataType.NTU
-    //% group="탁도(Turbidity)" weight=20
+    //% group="탁도(Turbidity)" weight=142
     export function turbidityRead(dtype: TurbidityDataType): number {
         // 아날로그 값 읽기 (여러 번 읽어서 평균)
         let analogSum = 0
@@ -1388,7 +1388,7 @@ namespace Sensors03 {
     /********** PIR 모션 센서 **********/
 
     //% block="PIR motion detected pin %pin"
-    //% group="Other Sensors" weight=40
+    //% group="Other Sensors" weight=50
     export function pirRead(pin: DigitalPin): boolean {
         return pins.digitalReadPin(pin) == 1
     }
@@ -1397,7 +1397,7 @@ namespace Sensors03 {
     /********** 토양 수분 센서 **********/
 
     //% block="soil moisture read pin %pin"
-    //% group="Other Sensors" weight=39
+    //% group="Other Sensors" weight=49
     export function soilMoistureRead(pin: AnalogPin): number {
         return pins.analogReadPin(pin)
     }
@@ -1406,7 +1406,7 @@ namespace Sensors03 {
     /********** 수위 센서 **********/
 
     //% block="water level read pin %pin"
-    //% group="Other Sensors" weight=38
+    //% group="Other Sensors" weight=48
     export function waterLevelRead(pin: AnalogPin): number {
         return pins.analogReadPin(pin)
     }
@@ -1415,7 +1415,7 @@ namespace Sensors03 {
     /********** 사운드 센서 **********/
 
     //% block="sound level read pin %pin"
-    //% group="Other Sensors" weight=37
+    //% group="Other Sensors" weight=47
     export function soundRead(pin: AnalogPin): number {
         return pins.analogReadPin(pin)
     }
@@ -1424,7 +1424,7 @@ namespace Sensors03 {
     /********** 진동 센서 **********/
 
     //% block="vibration detected pin %pin"
-    //% group="Other Sensors" weight=36
+    //% group="Other Sensors" weight=46
     export function vibrationRead(pin: DigitalPin): boolean {
         return pins.digitalReadPin(pin) == 1
     }
@@ -1433,7 +1433,7 @@ namespace Sensors03 {
     /********** 불꽃 센서 **********/
 
     //% block="flame detected read pin %pin"
-    //% group="Other Sensors" weight=35
+    //% group="Other Sensors" weight=45
     export function flameRead(pin: AnalogPin): number {
         return pins.analogReadPin(pin)
     }
@@ -1442,7 +1442,7 @@ namespace Sensors03 {
     /********** 터치 센서 **********/
 
     //% block="touch detected pin %pin"
-    //% group="Other Sensors" weight=34
+    //% group="Other Sensors" weight=44
     export function touchRead(pin: DigitalPin): boolean {
         return pins.digitalReadPin(pin) == 1
     }
@@ -1487,7 +1487,7 @@ namespace Sensors03 {
     //% xPin.defl=AnalogPin.P0
     //% yPin.defl=AnalogPin.P1
     //% btnPin.defl=DigitalPin.P2
-    //% group="Joystick" weight=90
+    //% group="Joystick" weight=88
     //% inlineInputMode=inline
     export function joystickInit(xPin: AnalogPin, yPin: AnalogPin, btnPin: DigitalPin): void {
         _joyXPin = xPin
@@ -1501,19 +1501,19 @@ namespace Sensors03 {
     }
 
     //% block="joystick Xaxis value"
-    //% group="Joystick" weight=89
+    //% group="Joystick" weight=87
     export function joystickX(): number {
         return pins.analogReadPin(_joyXPin)
     }
 
     //% block="joystick Yaxis value"
-    //% group="Joystick" weight=88
+    //% group="Joystick" weight=86
     export function joystickY(): number {
         return pins.analogReadPin(_joyYPin)
     }
 
     //% block="joystick Xaxis value (-100 ~ 100)"
-    //% group="Joystick" weight=87
+    //% group="Joystick" weight=85
     export function joystickXPercent(): number {
         let raw = pins.analogReadPin(_joyXPin)
         let percent = Math.floor((raw - _joyCenterX) / 5.12)
@@ -1521,7 +1521,7 @@ namespace Sensors03 {
     }
 
     //% block="joystick Yaxis value (-100 ~ 100)"
-    //% group="Joystick" weight=86
+    //% group="Joystick" weight=84
     export function joystickYPercent(): number {
         let raw = pins.analogReadPin(_joyYPin)
         let percent = Math.floor((raw - _joyCenterY) / 5.12)
@@ -1529,13 +1529,13 @@ namespace Sensors03 {
     }
 
     //% block="joystick button pressed?"
-    //% group="Joystick" weight=85
+    //% group="Joystick" weight=83
     export function joystickButton(): boolean {
         return pins.digitalReadPin(_joyBtnPin) == 0
     }
 
     //% block="joystick direction"
-    //% group="Joystick" weight=84
+    //% group="Joystick" weight=82
     export function joystickDirection(): JoystickDir {
         let x = pins.analogReadPin(_joyXPin)
         let y = pins.analogReadPin(_joyYPin)
@@ -1563,7 +1563,7 @@ namespace Sensors03 {
 
     //% block="joystick direction %dir ?"
     //% dir.defl=JoystickDir.Up
-    //% group="Joystick" weight=83
+    //% group="Joystick" weight=81
     export function joystickIs(dir: JoystickDir): boolean {
         return joystickDirection() == dir
     }
@@ -1609,7 +1609,7 @@ namespace Sensors03 {
     //% kpType.defl=KeypadType.Keypad4x4
     //% r1.defl=DigitalPin.P0 r2.defl=DigitalPin.P1 r3.defl=DigitalPin.P2 r4.defl=DigitalPin.P3
     //% c1.defl=DigitalPin.P4 c2.defl=DigitalPin.P5 c3.defl=DigitalPin.P6 c4.defl=DigitalPin.P7
-    //% group="Keypad" weight=82
+    //% group="Keypad" weight=75
     //% inlineInputMode=inline
     export function keypadInit(kpType: KeypadType, r1: DigitalPin, r2: DigitalPin, r3: DigitalPin, r4: DigitalPin, c1: DigitalPin, c2: DigitalPin, c3: DigitalPin, c4: DigitalPin): void {
         _kpType = kpType
@@ -1631,7 +1631,7 @@ namespace Sensors03 {
     }
 
     //% block="keypad key read"
-    //% group="Keypad" weight=81
+    //% group="Keypad" weight=74
     export function keypadRead(): string {
         let numCols = _kpType == KeypadType.Keypad4x4 ? 4 : 3
         let keys = _kpType == KeypadType.Keypad4x4 ? KEYPAD_4X4 : KEYPAD_4X3
@@ -1670,34 +1670,34 @@ namespace Sensors03 {
     }
 
     //% block="keypad key pressed?"
-    //% group="Keypad" weight=80
+    //% group="Keypad" weight=73
     export function keypadPressed(): boolean {
         return keypadRead() != ""
     }
 
     //% block="keypad last key"
-    //% group="Keypad" weight=79
+    //% group="Keypad" weight=72
     export function keypadLastKey(): string {
         return _kpLastKey
     }
 
     //% block="keypad key %key ?"
     //% key.defl="1"
-    //% group="Keypad" weight=78
+    //% group="Keypad" weight=71
     export function keypadIs(key: string): boolean {
         let pressed = keypadRead()
         return pressed == key
     }
 
     //% block="keypad number key pressed? (0-9)"
-    //% group="Keypad" weight=77
+    //% group="Keypad" weight=70
     export function keypadIsNumber(): boolean {
         let key = keypadRead()
         return key >= "0" && key <= "9"
     }
 
     //% block="keypad pressed key number to"
-    //% group="Keypad" weight=76
+    //% group="Keypad" weight=69
     export function keypadNumber(): number {
         let key = _kpLastKey
         if (key >= "0" && key <= "9") {
@@ -1732,7 +1732,7 @@ namespace Sensors03 {
     //% block="rotary encoder: DT pin %dt|CLK pin %clk|set"
     //% dt.defl=DigitalPin.P2
     //% clk.defl=DigitalPin.P3
-    //% group="Rotary Encoder" weight=75
+    //% group="Rotary Encoder" weight=195
     //% inlineInputMode=inline
     export function rotaryInit(dt: DigitalPin, clk: DigitalPin): void {
         _rotaryDT = dt
@@ -1743,7 +1743,7 @@ namespace Sensors03 {
     }
 
     //% block="rotary encoder rotate value"
-    //% group="Rotary Encoder" weight=74
+    //% group="Rotary Encoder" weight=194
     export function rotaryRead(): number {
         let currentCLK = pins.digitalReadPin(_rotaryCLK)
         let change = 0
@@ -1767,7 +1767,7 @@ namespace Sensors03 {
     }
 
     //% block="rotary encoder rotate direction"
-    //% group="Rotary Encoder" weight=73
+    //% group="Rotary Encoder" weight=193
     export function rotaryDirection(): RotaryDir {
         rotaryRead()  // 상태 업데이트
         let dir = _rotaryDirection
@@ -1776,14 +1776,14 @@ namespace Sensors03 {
     }
 
     //% block="rotary encoder counter"
-    //% group="Rotary Encoder" weight=72
+    //% group="Rotary Encoder" weight=192
     export function rotaryCounter(): number {
         rotaryRead()  // 상태 업데이트
         return _rotaryCounter
     }
 
     //% block="rotary encoder counter reset"
-    //% group="Rotary Encoder" weight=71
+    //% group="Rotary Encoder" weight=191
     export function rotaryReset(): void {
         _rotaryCounter = 0
         _rotaryDirection = RotaryDir.None
@@ -1794,7 +1794,7 @@ namespace Sensors03 {
 
     //% block="button pressed? (digital pin %pin)"
     //% pin.defl=DigitalPin.P0
-    //% group="Button" weight=70
+    //% group="Button" weight=65
     export function buttonRead(pin: DigitalPin): boolean {
         pins.setPull(pin, PinPullMode.PullUp)
         return pins.digitalReadPin(pin) == 0
@@ -1802,7 +1802,7 @@ namespace Sensors03 {
 
     //% block="button pressed wait (digital pin %pin)"
     //% pin.defl=DigitalPin.P0
-    //% group="Button" weight=69
+    //% group="Button" weight=64
     export function buttonWait(pin: DigitalPin): void {
         pins.setPull(pin, PinPullMode.PullUp)
         while (pins.digitalReadPin(pin) == 1) {
@@ -1816,14 +1816,14 @@ namespace Sensors03 {
 
     //% block="potentiometer value (analog pin %pin)"
     //% pin.defl=AnalogPin.P0
-    //% group="Potentiometer" weight=68
+    //% group="Potentiometer" weight=60
     export function potentiometerRead(pin: AnalogPin): number {
         return pins.analogReadPin(pin)
     }
 
     //% block="potentiometer value 0~100 (analog pin %pin)"
     //% pin.defl=AnalogPin.P0
-    //% group="Potentiometer" weight=67
+    //% group="Potentiometer" weight=59
     export function potentiometerPercent(pin: AnalogPin): number {
         return Math.floor(pins.analogReadPin(pin) / 10.23)
     }
