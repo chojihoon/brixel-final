@@ -398,137 +398,6 @@ namespace OutputDevice {
     }
 
 
-    /********** DFPlayer MP3 모듈 **********/
-
-    // DFPlayer Mini는 SD카드의 MP3 파일을 재생하는 모듈입니다.
-
-    // DFPlayer 상태 변수
-    let _dfpTx: SerialPin = SerialPin.P1
-    let _dfpRx: SerialPin = SerialPin.P2
-    let _dfpVolume: number = 15
-
-    //% block="MP3 player(DFPlayer) set|TX pin %tx|RX pin %rx"
-    //% tx.defl=SerialPin.P1
-    //% rx.defl=SerialPin.P2
-    //% group="MP3 Player (DFPlayer)" weight=89
-    //% inlineInputMode=inline
-    export function dfplayerInit(tx: SerialPin, rx: SerialPin): void {
-        _dfpTx = tx
-        _dfpRx = rx
-        serial.redirect(tx, rx, BaudRate.BaudRate9600)
-        basic.pause(500)
-
-        // 초기 볼륨 설정
-        dfplayerSetVolume(15)
-    }
-
-    //% block="MP3 player(DFPlayer) play track %track"
-    //% track.defl=1 track.min=1 track.max=255
-    //% group="MP3 Player (DFPlayer)" weight=88
-    export function dfplayerPlay(track: number): void {
-        dfplayerSendCmd(0x03, track)
-    }
-
-    //% block="MP3 pause"
-    //% group="MP3 Player (DFPlayer)" weight=87
-    export function dfplayerPause(): void {
-        dfplayerSendCmd(0x0E, 0)
-    }
-
-    //% block="MP3 resume"
-    //% group="MP3 Player (DFPlayer)" weight=86
-    export function dfplayerResume(): void {
-        dfplayerSendCmd(0x0D, 0)
-    }
-
-    //% block="MP3 stop"
-    //% group="MP3 Player (DFPlayer)" weight=85
-    export function dfplayerStop(): void {
-        dfplayerSendCmd(0x16, 0)
-    }
-
-    //% block="MP3 volume %volume (0~30)"
-    //% volume.defl=15 volume.min=0 volume.max=30
-    //% group="MP3 Player (DFPlayer)" weight=84
-    export function dfplayerSetVolume(volume: number): void {
-        _dfpVolume = Math.clamp(0, 30, volume)
-        dfplayerSendCmd(0x06, _dfpVolume)
-    }
-
-    //% block="MP3 player(DFPlayer) next track"
-    //% group="MP3 Player (DFPlayer)" weight=83
-    export function dfplayerNext(): void {
-        dfplayerSendCmd(0x01, 0)
-    }
-
-    //% block="MP3 player(DFPlayer) previous track"
-    //% group="MP3 Player (DFPlayer)" weight=82
-    export function dfplayerPrevious(): void {
-        dfplayerSendCmd(0x02, 0)
-    }
-
-    //% block="MP3 player(DFPlayer) play folder %folder 's file %file"
-    //% folder.defl=1 folder.min=1 folder.max=99
-    //% file.defl=1 file.min=1 file.max=255
-    //% group="MP3 Player (DFPlayer)" weight=81
-    //% inlineInputMode=inline
-    export function dfplayerPlayFolder(folder: number, file: number): void {
-        dfplayerSendCmd(0x0F, (folder << 8) | file)
-    }
-
-    //% block="MP3 loop %state"
-    //% state.shadow="toggleOnOff" state.defl=true
-    //% group="MP3 Player (DFPlayer)" weight=80
-    export function dfplayerLoop(state: boolean): void {
-        dfplayerSendCmd(0x11, state ? 1 : 0)
-    }
-
-    // DFPlayer 명령 전송 함수
-    function dfplayerSendCmd(cmd: number, param: number): void {
-        let buf = pins.createBuffer(10)
-        buf[0] = 0x7E  // 시작 바이트
-        buf[1] = 0xFF  // 버전
-        buf[2] = 0x06  // 길이
-        buf[3] = cmd   // 명령
-        buf[4] = 0x00  // 피드백 (0: 없음)
-        buf[5] = (param >> 8) & 0xFF  // 파라미터 상위
-        buf[6] = param & 0xFF         // 파라미터 하위
-
-        // 체크섬 계산
-        let checksum = 0 - (0xFF + 0x06 + cmd + 0x00 + buf[5] + buf[6])
-        buf[7] = (checksum >> 8) & 0xFF
-        buf[8] = checksum & 0xFF
-
-        buf[9] = 0xEF  // 종료 바이트
-
-        serial.writeBuffer(buf)
-        basic.pause(30)
-    }
-
-
-    /********** Microphone **********/
-
-    //% block="microphone value (0~1023) %pin"
-    //% pin.defl=AnalogPin.P0
-    //% group="Microphone" weight=70
-    export function microphoneValue(pin: AnalogPin): number {
-        return pins.analogReadPin(pin)
-    }
-
-    //% block="microphone average (samples: %samples) %pin"
-    //% pin.defl=AnalogPin.P0
-    //% samples.defl=10 samples.min=1 samples.max=100
-    //% group="Microphone" weight=69
-    export function microphoneAverage(pin: AnalogPin, samples: number): number {
-        let sum = 0
-        for (let i = 0; i < samples; i++) {
-            sum += pins.analogReadPin(pin)
-            basic.pause(1)
-        }
-        return Math.floor(sum / samples)
-    }
-
-
     /********** SD 카드 **********/
 
     // SD 카드 모듈 (SPI 통신)
@@ -693,6 +562,114 @@ namespace OutputDevice {
     }
 
 
+    /********** DFPlayer MP3 모듈 **********/
+
+    // DFPlayer Mini는 SD카드의 MP3 파일을 재생하는 모듈입니다.
+
+    // DFPlayer 상태 변수
+    let _dfpTx: SerialPin = SerialPin.P1
+    let _dfpRx: SerialPin = SerialPin.P2
+    let _dfpVolume: number = 15
+
+    //% block="MP3 player(DFPlayer) set|TX pin %tx|RX pin %rx"
+    //% tx.defl=SerialPin.P1
+    //% rx.defl=SerialPin.P2
+    //% group="MP3 Player (DFPlayer)" weight=89
+    //% inlineInputMode=inline
+    export function dfplayerInit(tx: SerialPin, rx: SerialPin): void {
+        _dfpTx = tx
+        _dfpRx = rx
+        serial.redirect(tx, rx, BaudRate.BaudRate9600)
+        basic.pause(500)
+
+        // 초기 볼륨 설정
+        dfplayerSetVolume(15)
+    }
+
+    //% block="MP3 player(DFPlayer) play track %track"
+    //% track.defl=1 track.min=1 track.max=255
+    //% group="MP3 Player (DFPlayer)" weight=88
+    export function dfplayerPlay(track: number): void {
+        dfplayerSendCmd(0x03, track)
+    }
+
+    //% block="MP3 pause"
+    //% group="MP3 Player (DFPlayer)" weight=87
+    export function dfplayerPause(): void {
+        dfplayerSendCmd(0x0E, 0)
+    }
+
+    //% block="MP3 resume"
+    //% group="MP3 Player (DFPlayer)" weight=86
+    export function dfplayerResume(): void {
+        dfplayerSendCmd(0x0D, 0)
+    }
+
+    //% block="MP3 stop"
+    //% group="MP3 Player (DFPlayer)" weight=85
+    export function dfplayerStop(): void {
+        dfplayerSendCmd(0x16, 0)
+    }
+
+    //% block="MP3 volume %volume (0~30)"
+    //% volume.defl=15 volume.min=0 volume.max=30
+    //% group="MP3 Player (DFPlayer)" weight=84
+    export function dfplayerSetVolume(volume: number): void {
+        _dfpVolume = Math.clamp(0, 30, volume)
+        dfplayerSendCmd(0x06, _dfpVolume)
+    }
+
+    //% block="MP3 player(DFPlayer) next track"
+    //% group="MP3 Player (DFPlayer)" weight=83
+    export function dfplayerNext(): void {
+        dfplayerSendCmd(0x01, 0)
+    }
+
+    //% block="MP3 player(DFPlayer) previous track"
+    //% group="MP3 Player (DFPlayer)" weight=82
+    export function dfplayerPrevious(): void {
+        dfplayerSendCmd(0x02, 0)
+    }
+
+    //% block="MP3 player(DFPlayer) play folder %folder 's file %file"
+    //% folder.defl=1 folder.min=1 folder.max=99
+    //% file.defl=1 file.min=1 file.max=255
+    //% group="MP3 Player (DFPlayer)" weight=81
+    //% inlineInputMode=inline
+    export function dfplayerPlayFolder(folder: number, file: number): void {
+        dfplayerSendCmd(0x0F, (folder << 8) | file)
+    }
+
+    //% block="MP3 loop %state"
+    //% state.shadow="toggleOnOff" state.defl=true
+    //% group="MP3 Player (DFPlayer)" weight=80
+    export function dfplayerLoop(state: boolean): void {
+        dfplayerSendCmd(0x11, state ? 1 : 0)
+    }
+
+    // DFPlayer 명령 전송 함수
+    function dfplayerSendCmd(cmd: number, param: number): void {
+        let buf = pins.createBuffer(10)
+        buf[0] = 0x7E  // 시작 바이트
+        buf[1] = 0xFF  // 버전
+        buf[2] = 0x06  // 길이
+        buf[3] = cmd   // 명령
+        buf[4] = 0x00  // 피드백 (0: 없음)
+        buf[5] = (param >> 8) & 0xFF  // 파라미터 상위
+        buf[6] = param & 0xFF         // 파라미터 하위
+
+        // 체크섬 계산
+        let checksum = 0 - (0xFF + 0x06 + cmd + 0x00 + buf[5] + buf[6])
+        buf[7] = (checksum >> 8) & 0xFF
+        buf[8] = checksum & 0xFF
+
+        buf[9] = 0xEF  // 종료 바이트
+
+        serial.writeBuffer(buf)
+        basic.pause(30)
+    }
+
+
     /********** EEPROM (AT24C32/AT24C64 등) **********/
 
     // I2C EEPROM - 전원이 꺼져도 데이터 유지
@@ -786,5 +763,28 @@ namespace OutputDevice {
         let b2 = eepromRead(memAddr + 2)
         let b3 = eepromRead(memAddr + 3)
         return (b0 << 24) | (b1 << 16) | (b2 << 8) | b3
+    }
+
+
+    /********** Microphone **********/
+
+    //% block="microphone value (0~1023) %pin"
+    //% pin.defl=AnalogPin.P0
+    //% group="Microphone" weight=70
+    export function microphoneValue(pin: AnalogPin): number {
+        return pins.analogReadPin(pin)
+    }
+
+    //% block="microphone average (samples: %samples) %pin"
+    //% pin.defl=AnalogPin.P0
+    //% samples.defl=10 samples.min=1 samples.max=100
+    //% group="Microphone" weight=69
+    export function microphoneAverage(pin: AnalogPin, samples: number): number {
+        let sum = 0
+        for (let i = 0; i < samples; i++) {
+            sum += pins.analogReadPin(pin)
+            basic.pause(1)
+        }
+        return Math.floor(sum / samples)
     }
 }

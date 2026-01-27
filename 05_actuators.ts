@@ -4,653 +4,9 @@
  */
 
 //% weight=1060 color=#50B91A icon="\uf013" block="05. Actuators"
-//% groups="['Servo Motors', 'DC모터(L9110)', 'Stepper Motors', 'Servo Driver(PCA9685)', 'DC모터(L298N)', 'DC모터(L293D)', '듀얼 H-브리지 모터(TB6612FNG)', '듀얼 H-브리지 DC 모터(DRV8833)', 'Relays', 'Solenoid', 'Fan모터', 'Pump모터']"
+//% groups="['Servo Motors', 'Servo Driver(PCA9685)', 'Stepper Motors', 'DC모터(L9110)', 'DC모터(L298N)', 'DC모터(L293D)', '듀얼 H-브리지 모터(TB6612FNG)', '듀얼 H-브리지 DC 모터(DRV8833)', 'Relays', 'Solenoid', 'Fan모터', 'Pump모터']"
 namespace Actuators05 {
 
-
-    /********** L9110 모터 드라이버 **********/
-
-    // L9110 방향
-    export enum L9110Direction {
-        //% block="Clockwise"
-        Clockwise = 0,
-        //% block="Counter Clockwise"
-        CounterClockwise = 1
-    }
-
-    // L9110 핀 저장 변수 (최대 4개 모터)
-    let _l9110PinA: AnalogPin[] = [AnalogPin.P0, AnalogPin.P0, AnalogPin.P0, AnalogPin.P0]
-    let _l9110PinB: AnalogPin[] = [AnalogPin.P1, AnalogPin.P1, AnalogPin.P1, AnalogPin.P1]
-
-    /**
-     * L9110 Motor Pin Setup
-     * @param motor Motor number (1-4)
-     * @param pinA Pin A
-     * @param pinB Pin B
-     */
-    //% block="DC Motor(L9110) $motor : Pin A $pinA , Pin B $pinB Setup"
-    //% motor.min=1 motor.max=4 motor.defl=1
-    //% pinA.defl=AnalogPin.P5
-    //% pinB.defl=AnalogPin.P6
-    //% group="DC모터(L9110)" weight=105
-    //% inlineInputMode=inline
-    export function l9110SetPins(motor: number, pinA: AnalogPin, pinB: AnalogPin): void {
-        let i = motor - 1
-        _l9110PinA[i] = pinA
-        _l9110PinB[i] = pinB
-    }
-
-    /**
-     * L9110 Motor Run
-     * @param motor Motor number (1-4)
-     * @param speed Speed (0-255)
-     * @param direction Direction
-     */
-    //% block="DC Motor $motor : Speed $speed , Direction $direction Rotate"
-    //% motor.min=1 motor.max=4 motor.defl=1
-    //% speed.min=0 speed.max=255 speed.defl=150
-    //% direction.defl=L9110Direction.Clockwise
-    //% group="DC모터(L9110)" weight=104
-    //% inlineInputMode=inline
-    export function l9110Run(motor: number, speed: number, direction: L9110Direction): void {
-        let i = motor - 1
-        let pwm = Math.map(speed, 0, 255, 0, 1023)
-        
-        if (direction == L9110Direction.Clockwise) {
-            pins.analogWritePin(_l9110PinA[i], pwm)
-            pins.analogWritePin(_l9110PinB[i], 0)
-        } else {
-            pins.analogWritePin(_l9110PinA[i], 0)
-            pins.analogWritePin(_l9110PinB[i], pwm)
-        }
-    }
-
-    /**
-     * L9110 Motor Stop
-     * @param motor Motor number (1-4)
-     */
-    //% block="DC Motor $motor : Stop"
-    //% motor.min=1 motor.max=4 motor.defl=1
-    //% group="DC모터(L9110)" weight=103
-    export function l9110Stop(motor: number): void {
-        let i = motor - 1
-        pins.analogWritePin(_l9110PinA[i], 0)
-        pins.analogWritePin(_l9110PinB[i], 0)
-    }
-
-
-    /********** L298N 모터 드라이버 **********/
-
-    // L298N 핀 저장 변수
-    let _l298nENA: AnalogPin = AnalogPin.P0
-    let _l298nIN1: DigitalPin = DigitalPin.P1
-    let _l298nIN2: DigitalPin = DigitalPin.P2
-    let _l298nENB: AnalogPin = AnalogPin.P3
-    let _l298nIN3: DigitalPin = DigitalPin.P4
-    let _l298nIN4: DigitalPin = DigitalPin.P5
-
-    //% block="L298N motorA pin set ENA %ena IN1 %in1 IN2 %in2"
-    //% group="DC모터(L298N)" weight=100
-    export function l298nSetPinsA(ena: AnalogPin, in1: DigitalPin, in2: DigitalPin): void {
-        _l298nENA = ena
-        _l298nIN1 = in1
-        _l298nIN2 = in2
-    }
-
-    //% block="L298N motorB pin set ENB %enb IN3 %in3 IN4 %in4"
-    //% group="DC모터(L298N)" weight=99
-    export function l298nSetPinsB(enb: AnalogPin, in3: DigitalPin, in4: DigitalPin): void {
-        _l298nENB = enb
-        _l298nIN3 = in3
-        _l298nIN4 = in4
-    }
-
-    //% block="L298N motorA speed %speed"
-    //% speed.min=-100 speed.max=100 speed.defl=0
-    //% group="DC모터(L298N)" weight=98
-    export function l298nMotorA(speed: number): void {
-        let pwm = Math.abs(speed) * 10.23
-        if (speed > 0) {
-            pins.digitalWritePin(_l298nIN1, 1)
-            pins.digitalWritePin(_l298nIN2, 0)
-        } else if (speed < 0) {
-            pins.digitalWritePin(_l298nIN1, 0)
-            pins.digitalWritePin(_l298nIN2, 1)
-        } else {
-            pins.digitalWritePin(_l298nIN1, 0)
-            pins.digitalWritePin(_l298nIN2, 0)
-        }
-        pins.analogWritePin(_l298nENA, pwm)
-    }
-
-    //% block="L298N motorB speed %speed"
-    //% speed.min=-100 speed.max=100 speed.defl=0
-    //% group="DC모터(L298N)" weight=97
-    export function l298nMotorB(speed: number): void {
-        let pwm = Math.abs(speed) * 10.23
-        if (speed > 0) {
-            pins.digitalWritePin(_l298nIN3, 1)
-            pins.digitalWritePin(_l298nIN4, 0)
-        } else if (speed < 0) {
-            pins.digitalWritePin(_l298nIN3, 0)
-            pins.digitalWritePin(_l298nIN4, 1)
-        } else {
-            pins.digitalWritePin(_l298nIN3, 0)
-            pins.digitalWritePin(_l298nIN4, 0)
-        }
-        pins.analogWritePin(_l298nENB, pwm)
-    }
-
-
-    /********** L293D 모터 드라이버 **********/
-
-    // L293D 핀 저장 변수
-    let _l293dEN1: AnalogPin = AnalogPin.P0
-    let _l293dIN1: DigitalPin = DigitalPin.P1
-    let _l293dIN2: DigitalPin = DigitalPin.P2
-    let _l293dEN2: AnalogPin = AnalogPin.P3
-    let _l293dIN3: DigitalPin = DigitalPin.P4
-    let _l293dIN4: DigitalPin = DigitalPin.P5
-
-    //% block="L293D motor1 pin set EN1 %en1 IN1 %in1 IN2 %in2"
-    //% group="DC모터(L293D)" weight=96
-    export function l293dSetPins1(en1: AnalogPin, in1: DigitalPin, in2: DigitalPin): void {
-        _l293dEN1 = en1
-        _l293dIN1 = in1
-        _l293dIN2 = in2
-    }
-
-    //% block="L293D motor2 pin set EN2 %en2 IN3 %in3 IN4 %in4"
-    //% group="DC모터(L293D)" weight=95
-    export function l293dSetPins2(en2: AnalogPin, in3: DigitalPin, in4: DigitalPin): void {
-        _l293dEN2 = en2
-        _l293dIN3 = in3
-        _l293dIN4 = in4
-    }
-
-    //% block="L293D motor1 speed %speed"
-    //% speed.min=-100 speed.max=100 speed.defl=0
-    //% group="DC모터(L293D)" weight=94
-    export function l293dMotor1(speed: number): void {
-        let pwm = Math.abs(speed) * 10.23
-        if (speed > 0) {
-            pins.digitalWritePin(_l293dIN1, 1)
-            pins.digitalWritePin(_l293dIN2, 0)
-        } else if (speed < 0) {
-            pins.digitalWritePin(_l293dIN1, 0)
-            pins.digitalWritePin(_l293dIN2, 1)
-        } else {
-            pins.digitalWritePin(_l293dIN1, 0)
-            pins.digitalWritePin(_l293dIN2, 0)
-        }
-        pins.analogWritePin(_l293dEN1, pwm)
-    }
-
-    //% block="L293D motor2 speed %speed"
-    //% speed.min=-100 speed.max=100 speed.defl=0
-    //% group="DC모터(L293D)" weight=93
-    export function l293dMotor2(speed: number): void {
-        let pwm = Math.abs(speed) * 10.23
-        if (speed > 0) {
-            pins.digitalWritePin(_l293dIN3, 1)
-            pins.digitalWritePin(_l293dIN4, 0)
-        } else if (speed < 0) {
-            pins.digitalWritePin(_l293dIN3, 0)
-            pins.digitalWritePin(_l293dIN4, 1)
-        } else {
-            pins.digitalWritePin(_l293dIN3, 0)
-            pins.digitalWritePin(_l293dIN4, 0)
-        }
-        pins.analogWritePin(_l293dEN2, pwm)
-    }
-
-
-    /********** TB6612FNG 모터 드라이버 **********/
-
-    // TB6612FNG 핀 저장 변수
-    let _tb6612PWMA: AnalogPin = AnalogPin.P0
-    let _tb6612AIN1: DigitalPin = DigitalPin.P1
-    let _tb6612AIN2: DigitalPin = DigitalPin.P2
-    let _tb6612PWMB: AnalogPin = AnalogPin.P3
-    let _tb6612BIN1: DigitalPin = DigitalPin.P4
-    let _tb6612BIN2: DigitalPin = DigitalPin.P5
-    let _tb6612STBY: DigitalPin = DigitalPin.P6
-
-    //% block="TB6612FNG pin set PWMA %pwma AIN1 %ain1 AIN2 %ain2 STBY %stby"
-    //% group="듀얼 H-브리지 모터(TB6612FNG)" weight=92
-    export function tb6612SetPinsA(pwma: AnalogPin, ain1: DigitalPin, ain2: DigitalPin, stby: DigitalPin): void {
-        _tb6612PWMA = pwma
-        _tb6612AIN1 = ain1
-        _tb6612AIN2 = ain2
-        _tb6612STBY = stby
-        pins.digitalWritePin(_tb6612STBY, 1)
-    }
-
-    //% block="TB6612FNG motorB pin set PWMB %pwmb BIN1 %bin1 BIN2 %bin2"
-    //% group="듀얼 H-브리지 모터(TB6612FNG)" weight=91
-    export function tb6612SetPinsB(pwmb: AnalogPin, bin1: DigitalPin, bin2: DigitalPin): void {
-        _tb6612PWMB = pwmb
-        _tb6612BIN1 = bin1
-        _tb6612BIN2 = bin2
-    }
-
-    //% block="TB6612FNG motorA speed %speed"
-    //% speed.min=-100 speed.max=100 speed.defl=0
-    //% group="듀얼 H-브리지 모터(TB6612FNG)" weight=90
-    export function tb6612MotorA(speed: number): void {
-        let pwm = Math.abs(speed) * 10.23
-        if (speed > 0) {
-            pins.digitalWritePin(_tb6612AIN1, 1)
-            pins.digitalWritePin(_tb6612AIN2, 0)
-        } else if (speed < 0) {
-            pins.digitalWritePin(_tb6612AIN1, 0)
-            pins.digitalWritePin(_tb6612AIN2, 1)
-        } else {
-            pins.digitalWritePin(_tb6612AIN1, 0)
-            pins.digitalWritePin(_tb6612AIN2, 0)
-        }
-        pins.analogWritePin(_tb6612PWMA, pwm)
-    }
-
-    //% block="TB6612FNG motorB speed %speed"
-    //% speed.min=-100 speed.max=100 speed.defl=0
-    //% group="듀얼 H-브리지 모터(TB6612FNG)" weight=89
-    export function tb6612MotorB(speed: number): void {
-        let pwm = Math.abs(speed) * 10.23
-        if (speed > 0) {
-            pins.digitalWritePin(_tb6612BIN1, 1)
-            pins.digitalWritePin(_tb6612BIN2, 0)
-        } else if (speed < 0) {
-            pins.digitalWritePin(_tb6612BIN1, 0)
-            pins.digitalWritePin(_tb6612BIN2, 1)
-        } else {
-            pins.digitalWritePin(_tb6612BIN1, 0)
-            pins.digitalWritePin(_tb6612BIN2, 0)
-        }
-        pins.analogWritePin(_tb6612PWMB, pwm)
-    }
-
-
-    /********** DRV8833 모터 드라이버 **********/
-
-    // DRV8833 핀 저장 변수
-    let _drv8833AIN1: AnalogPin = AnalogPin.P0
-    let _drv8833AIN2: AnalogPin = AnalogPin.P1
-    let _drv8833BIN1: AnalogPin = AnalogPin.P2
-    let _drv8833BIN2: AnalogPin = AnalogPin.P3
-
-    //% block="DRV8833 motorA pin set AIN1 %ain1 AIN2 %ain2"
-    //% group="듀얼 H-브리지 DC 모터(DRV8833)" weight=88
-    export function drv8833SetPinsA(ain1: AnalogPin, ain2: AnalogPin): void {
-        _drv8833AIN1 = ain1
-        _drv8833AIN2 = ain2
-    }
-
-    //% block="DRV8833 motorB pin set BIN1 %bin1 BIN2 %bin2"
-    //% group="듀얼 H-브리지 DC 모터(DRV8833)" weight=87
-    export function drv8833SetPinsB(bin1: AnalogPin, bin2: AnalogPin): void {
-        _drv8833BIN1 = bin1
-        _drv8833BIN2 = bin2
-    }
-
-    //% block="DRV8833 motorA speed %speed"
-    //% speed.min=-100 speed.max=100 speed.defl=0
-    //% group="듀얼 H-브리지 DC 모터(DRV8833)" weight=86
-    export function drv8833MotorA(speed: number): void {
-        let pwm = Math.abs(speed) * 10.23
-        if (speed > 0) {
-            pins.analogWritePin(_drv8833AIN1, pwm)
-            pins.analogWritePin(_drv8833AIN2, 0)
-        } else if (speed < 0) {
-            pins.analogWritePin(_drv8833AIN1, 0)
-            pins.analogWritePin(_drv8833AIN2, pwm)
-        } else {
-            pins.analogWritePin(_drv8833AIN1, 0)
-            pins.analogWritePin(_drv8833AIN2, 0)
-        }
-    }
-
-    //% block="DRV8833 motorB speed %speed"
-    //% speed.min=-100 speed.max=100 speed.defl=0
-    //% group="듀얼 H-브리지 DC 모터(DRV8833)" weight=85
-    export function drv8833MotorB(speed: number): void {
-        let pwm = Math.abs(speed) * 10.23
-        if (speed > 0) {
-            pins.analogWritePin(_drv8833BIN1, pwm)
-            pins.analogWritePin(_drv8833BIN2, 0)
-        } else if (speed < 0) {
-            pins.analogWritePin(_drv8833BIN1, 0)
-            pins.analogWritePin(_drv8833BIN2, pwm)
-        } else {
-            pins.analogWritePin(_drv8833BIN1, 0)
-            pins.analogWritePin(_drv8833BIN2, 0)
-        }
-    }
-
-    /********** NEMA17 스테퍼 모터 **********/
-
-    // 스테퍼 드라이버 타입
-    export enum StepperDriver {
-        //% block="Driver(2pin)"
-        Driver2Pin = 0,
-        //% block="ULN2003(4pin)"
-        ULN2003 = 1
-    }
-
-    // 스테퍼 이동 타입
-    export enum StepperMoveType {
-        //% block="Move to Absolute"
-        Absolute = 0,
-        //% block="Move to Relative"
-        Relative = 1
-    }
-
-    // 스테퍼 동작
-    export enum StepperAction {
-        //% block="Run"
-        Run = 0,
-        //% block="Stop"
-        Stop = 1
-    }
-
-    // 스테퍼 상태
-    export enum StepperStatus {
-        //% block="Current Position"
-        Position = 0,
-        //% block="Running"
-        Running = 1
-    }
-
-    // 스테퍼 모터 데이터 (최대 4개)
-    let _stepperDirPin: DigitalPin[] = [DigitalPin.P0, DigitalPin.P0, DigitalPin.P0, DigitalPin.P0]
-    let _stepperStepPin: DigitalPin[] = [DigitalPin.P1, DigitalPin.P1, DigitalPin.P1, DigitalPin.P1]
-    let _stepperMaxSpeed: number[] = [1000, 1000, 1000, 1000]
-    let _stepperAccel: number[] = [50, 50, 50, 50]
-    let _stepperSpeed: number[] = [200, 200, 200, 200]
-    let _stepperSteps: number[] = [200, 200, 200, 200]
-    let _stepperPosition: number[] = [0, 0, 0, 0]
-    let _stepperTarget: number[] = [0, 0, 0, 0]
-    let _stepperRunning: boolean[] = [false, false, false, false]
-
-    //% block="Stepper Motor(A4988) Driver( $index ) $driver : DIR Pin $dirPin , Step Pin $stepPin Setup"
-    //% index.min=1 index.max=4 index.defl=1
-    //% dirPin.defl=DigitalPin.P8
-    //% stepPin.defl=DigitalPin.P9
-    //% group="Stepper Motors" weight=76
-    //% inlineInputMode=inline
-    export function stepperSetup(index: number, driver: StepperDriver, dirPin: DigitalPin, stepPin: DigitalPin): void {
-        let i = index - 1
-        _stepperDirPin[i] = dirPin
-        _stepperStepPin[i] = stepPin
-    }
-
-    //% block="Stepper Motor $index : Max Speed $maxSpeed , Acceleration $accel , Speed Set $speed , Step Set $steps"
-    //% index.min=1 index.max=4 index.defl=1
-    //% maxSpeed.defl=1000 accel.defl=50 speed.defl=200 steps.defl=200
-    //% group="Stepper Motors" weight=75
-    //% inlineInputMode=inline
-    export function stepperConfig(index: number, maxSpeed: number, accel: number, speed: number, steps: number): void {
-        let i = index - 1
-        _stepperMaxSpeed[i] = maxSpeed
-        _stepperAccel[i] = accel
-        _stepperSpeed[i] = speed
-        _stepperSteps[i] = steps
-    }
-
-    //% block="Stepper Motor $index : $moveType $position"
-    //% index.min=1 index.max=4 index.defl=1
-    //% position.defl=200
-    //% group="Stepper Motors" weight=74
-    //% inlineInputMode=inline
-    export function stepperMove(index: number, moveType: StepperMoveType, position: number): void {
-        let i = index - 1
-        if (moveType == StepperMoveType.Absolute) {
-            _stepperTarget[i] = position
-        } else {
-            _stepperTarget[i] = _stepperPosition[i] + position
-        }
-    }
-
-    //% block="Stepper Motor $index : $action"
-    //% index.min=1 index.max=4 index.defl=1
-    //% group="Stepper Motors" weight=73
-    export function stepperAction(index: number, action: StepperAction): void {
-        let i = index - 1
-        if (action == StepperAction.Run) {
-            _stepperRunning[i] = true
-            let steps = _stepperTarget[i] - _stepperPosition[i]
-            let dir = steps > 0 ? 1 : 0
-            pins.digitalWritePin(_stepperDirPin[i], dir)
-
-            let delay = Math.floor(1000000 / _stepperSpeed[i] / 2)
-            for (let s = 0; s < Math.abs(steps); s++) {
-                if (!_stepperRunning[i]) break
-                pins.digitalWritePin(_stepperStepPin[i], 1)
-                control.waitMicros(delay)
-                pins.digitalWritePin(_stepperStepPin[i], 0)
-                control.waitMicros(delay)
-                _stepperPosition[i] += dir ? 1 : -1
-            }
-            _stepperRunning[i] = false
-        } else {
-            _stepperRunning[i] = false
-        }
-    }
-
-    //% block="Stepper Motor $index : $status"
-    //% index.min=1 index.max=4 index.defl=1
-    //% group="Stepper Motors" weight=72
-    export function stepperGetStatus(index: number, status: StepperStatus): number {
-        let i = index - 1
-        if (status == StepperStatus.Position) {
-            return _stepperPosition[i]
-        }
-        return _stepperRunning[i] ? 1 : 0
-    }
-
-
-    /********** 28BYJ-48 Stepper Motor (4-pin ULN2003) **********/
-
-    // 28BYJ-48 Motor Type
-    export enum Stepper28BYJType {
-        //% block="28BYJ-48"
-        BYJ48 = 0,
-        //% block="ULN2003"
-        ULN2003 = 1,
-        //% block="Custom"
-        Custom = 2
-    }
-
-    // 28BYJ-48 Pin Mode
-    export enum Stepper28BYJPinMode {
-        //% block="4pin"
-        Pin4 = 0,
-        //% block="2pin"
-        Pin2 = 1
-    }
-
-    // 28BYJ-48 Move Unit
-    export enum Stepper28BYJUnit {
-        //% block="Step"
-        Step = 0,
-        //% block="Degree"
-        Degree = 1,
-        //% block="Revolution"
-        Revolution = 2
-    }
-
-    // 28BYJ-48 Data Variables (max 4 motors)
-    let _28byj_in1: DigitalPin[] = [DigitalPin.P8, DigitalPin.P8, DigitalPin.P8, DigitalPin.P8]
-    let _28byj_in2: DigitalPin[] = [DigitalPin.P9, DigitalPin.P9, DigitalPin.P9, DigitalPin.P9]
-    let _28byj_in3: DigitalPin[] = [DigitalPin.P10, DigitalPin.P10, DigitalPin.P10, DigitalPin.P10]
-    let _28byj_in4: DigitalPin[] = [DigitalPin.P11, DigitalPin.P11, DigitalPin.P11, DigitalPin.P11]
-    let _28byj_rpm: number[] = [10, 10, 10, 10]
-    let _28byj_position: number[] = [0, 0, 0, 0]
-    let _28byj_target: number[] = [0, 0, 0, 0]
-    let _28byj_stepsPerRev: number = 2048  // 28BYJ-48 steps per revolution
-
-    // Half-step sequence for 28BYJ-48
-    const _28byj_sequence: number[][] = [
-        [1, 0, 0, 0],
-        [1, 1, 0, 0],
-        [0, 1, 0, 0],
-        [0, 1, 1, 0],
-        [0, 0, 1, 0],
-        [0, 0, 1, 1],
-        [0, 0, 0, 1],
-        [1, 0, 0, 1]
-    ]
-
-    /**
-     * 28BYJ-48 Stepper Motor Setup (4-pin)
-     * @param motorType Motor type
-     * @param index Motor index (1-4)
-     * @param pinMode Pin mode
-     * @param in1 IN1 pin
-     * @param in2 IN2 pin
-     * @param in3 IN3 pin
-     * @param in4 IN4 pin
-     */
-    //% block="Stepper Motor( $motorType & $index ) $pinMode Connection Pin: IN1 $in1 IN2 $in2 IN3 $in3 IN4 $in4"
-    //% motorType.defl=Stepper28BYJType.BYJ48
-    //% index.min=1 index.max=4 index.defl=1
-    //% pinMode.defl=Stepper28BYJPinMode.Pin4
-    //% in1.defl=DigitalPin.P8
-    //% in2.defl=DigitalPin.P9
-    //% in3.defl=DigitalPin.P10
-    //% in4.defl=DigitalPin.P11
-    //% group="Stepper Motors" weight=69
-    //% inlineInputMode=inline
-    export function stepper28BYJSetup(motorType: Stepper28BYJType, index: number, pinMode: Stepper28BYJPinMode, in1: DigitalPin, in2: DigitalPin, in3: DigitalPin, in4: DigitalPin): void {
-        let i = index - 1
-        _28byj_in1[i] = in1
-        _28byj_in2[i] = in2
-        _28byj_in3[i] = in3
-        _28byj_in4[i] = in4
-    }
-
-    /**
-     * 28BYJ-48 Set RPM
-     * @param index Motor index
-     * @param rpm Speed in RPM
-     */
-    //% block="Stepper Motor $index : Rotation Speed $rpm RPM"
-    //% index.min=1 index.max=4 index.defl=1
-    //% rpm.min=1 rpm.max=15 rpm.defl=10
-    //% group="Stepper Motors" weight=68
-    export function stepper28BYJSetRPM(index: number, rpm: number): void {
-        let i = index - 1
-        _28byj_rpm[i] = rpm
-    }
-
-    /**
-     * 28BYJ-48 Set Move Target
-     * @param index Motor index
-     * @param unit Move unit
-     * @param value Move value
-     */
-    //% block="Stepper Motor $index : $unit by $value Move Set"
-    //% index.min=1 index.max=4 index.defl=1
-    //% unit.defl=Stepper28BYJUnit.Step
-    //% value.defl=35
-    //% group="Stepper Motors" weight=67
-    //% inlineInputMode=inline
-    export function stepper28BYJSetMove(index: number, unit: Stepper28BYJUnit, value: number): void {
-        let i = index - 1
-        let steps = value
-        
-        if (unit == Stepper28BYJUnit.Degree) {
-            steps = Math.round(value * _28byj_stepsPerRev / 360)
-        } else if (unit == Stepper28BYJUnit.Revolution) {
-            steps = Math.round(value * _28byj_stepsPerRev)
-        }
-        
-        _28byj_target[i] = _28byj_position[i] + steps
-    }
-
-    /**
-     * 28BYJ-48 Move Motor
-     * @param index Motor index
-     */
-    //% block="Stepper Motor $index : Move"
-    //% index.min=1 index.max=4 index.defl=1
-    //% group="Stepper Motors" weight=66
-    export function stepper28BYJMove(index: number): void {
-        let i = index - 1
-        let stepsToMove = _28byj_target[i] - _28byj_position[i]
-        let direction = stepsToMove > 0 ? 1 : -1
-        stepsToMove = Math.abs(stepsToMove)
-        
-        // Calculate delay based on RPM
-        // 28BYJ-48: 2048 steps/rev, delay = 60000000 / (rpm * 2048 * 8) microseconds
-        let delayUs = Math.floor(60000000 / (_28byj_rpm[i] * _28byj_stepsPerRev))
-        
-        let seqIndex = 0
-        for (let s = 0; s < stepsToMove; s++) {
-            // Set pins according to sequence
-            pins.digitalWritePin(_28byj_in1[i], _28byj_sequence[seqIndex][0])
-            pins.digitalWritePin(_28byj_in2[i], _28byj_sequence[seqIndex][1])
-            pins.digitalWritePin(_28byj_in3[i], _28byj_sequence[seqIndex][2])
-            pins.digitalWritePin(_28byj_in4[i], _28byj_sequence[seqIndex][3])
-            
-            // Next sequence step
-            if (direction > 0) {
-                seqIndex = (seqIndex + 1) % 8
-            } else {
-                seqIndex = (seqIndex + 7) % 8
-            }
-            
-            _28byj_position[i] += direction
-            
-            control.waitMicros(delayUs)
-        }
-        
-        // Turn off all coils
-        pins.digitalWritePin(_28byj_in1[i], 0)
-        pins.digitalWritePin(_28byj_in2[i], 0)
-        pins.digitalWritePin(_28byj_in3[i], 0)
-        pins.digitalWritePin(_28byj_in4[i], 0)
-    }
-
-    /**
-     * 28BYJ-48 Stop Motor
-     * @param index Motor index
-     */
-    //% block="Stepper Motor $index : Stop"
-    //% index.min=1 index.max=4 index.defl=1
-    //% group="Stepper Motors" weight=65
-    export function stepper28BYJStop(index: number): void {
-        let i = index - 1
-        pins.digitalWritePin(_28byj_in1[i], 0)
-        pins.digitalWritePin(_28byj_in2[i], 0)
-        pins.digitalWritePin(_28byj_in3[i], 0)
-        pins.digitalWritePin(_28byj_in4[i], 0)
-        _28byj_target[i] = _28byj_position[i]
-    }
-
-    /**
-     * 28BYJ-48 Get Position
-     * @param index Motor index
-     */
-    //% block="Stepper Motor $index : Position"
-    //% index.min=1 index.max=4 index.defl=1
-    //% group="Stepper Motors" weight=64
-    export function stepper28BYJGetPosition(index: number): number {
-        return _28byj_position[index - 1]
-    }
-
-    /**
-     * 28BYJ-48 Reset Position
-     * @param index Motor index
-     */
-    //% block="Stepper Motor $index : Reset Position"
-    //% index.min=1 index.max=4 index.defl=1
-    //% group="Stepper Motors" weight=63
-    export function stepper28BYJResetPosition(index: number): void {
-        let i = index - 1
-        _28byj_position[i] = 0
-        _28byj_target[i] = 0
-    }
 
     /********** MG996R 서보 모터 **********/
 
@@ -1035,6 +391,652 @@ namespace Actuators05 {
     export function pca9685SetLED(index: number, channel: number, brightness: number): void {
         let pwmValue = Math.round(brightness * 4095 / 100)
         pca9685SetPWM(index, channel, 0, pwmValue)
+    }
+
+
+    /********** NEMA17 스테퍼 모터 **********/
+
+    // 스테퍼 드라이버 타입
+    export enum StepperDriver {
+        //% block="Driver(2pin)"
+        Driver2Pin = 0,
+        //% block="ULN2003(4pin)"
+        ULN2003 = 1
+    }
+
+    // 스테퍼 이동 타입
+    export enum StepperMoveType {
+        //% block="Move to Absolute"
+        Absolute = 0,
+        //% block="Move to Relative"
+        Relative = 1
+    }
+
+    // 스테퍼 동작
+    export enum StepperAction {
+        //% block="Run"
+        Run = 0,
+        //% block="Stop"
+        Stop = 1
+    }
+
+    // 스테퍼 상태
+    export enum StepperStatus {
+        //% block="Current Position"
+        Position = 0,
+        //% block="Running"
+        Running = 1
+    }
+
+    // 스테퍼 모터 데이터 (최대 4개)
+    let _stepperDirPin: DigitalPin[] = [DigitalPin.P0, DigitalPin.P0, DigitalPin.P0, DigitalPin.P0]
+    let _stepperStepPin: DigitalPin[] = [DigitalPin.P1, DigitalPin.P1, DigitalPin.P1, DigitalPin.P1]
+    let _stepperMaxSpeed: number[] = [1000, 1000, 1000, 1000]
+    let _stepperAccel: number[] = [50, 50, 50, 50]
+    let _stepperSpeed: number[] = [200, 200, 200, 200]
+    let _stepperSteps: number[] = [200, 200, 200, 200]
+    let _stepperPosition: number[] = [0, 0, 0, 0]
+    let _stepperTarget: number[] = [0, 0, 0, 0]
+    let _stepperRunning: boolean[] = [false, false, false, false]
+
+    //% block="Stepper Motor(A4988) Driver( $index ) $driver : DIR Pin $dirPin , Step Pin $stepPin Setup"
+    //% index.min=1 index.max=4 index.defl=1
+    //% dirPin.defl=DigitalPin.P8
+    //% stepPin.defl=DigitalPin.P9
+    //% group="Stepper Motors" weight=76
+    //% inlineInputMode=inline
+    export function stepperSetup(index: number, driver: StepperDriver, dirPin: DigitalPin, stepPin: DigitalPin): void {
+        let i = index - 1
+        _stepperDirPin[i] = dirPin
+        _stepperStepPin[i] = stepPin
+    }
+
+    //% block="Stepper Motor $index : Max Speed $maxSpeed , Acceleration $accel , Speed Set $speed , Step Set $steps"
+    //% index.min=1 index.max=4 index.defl=1
+    //% maxSpeed.defl=1000 accel.defl=50 speed.defl=200 steps.defl=200
+    //% group="Stepper Motors" weight=75
+    //% inlineInputMode=inline
+    export function stepperConfig(index: number, maxSpeed: number, accel: number, speed: number, steps: number): void {
+        let i = index - 1
+        _stepperMaxSpeed[i] = maxSpeed
+        _stepperAccel[i] = accel
+        _stepperSpeed[i] = speed
+        _stepperSteps[i] = steps
+    }
+
+    //% block="Stepper Motor $index : $moveType $position"
+    //% index.min=1 index.max=4 index.defl=1
+    //% position.defl=200
+    //% group="Stepper Motors" weight=74
+    //% inlineInputMode=inline
+    export function stepperMove(index: number, moveType: StepperMoveType, position: number): void {
+        let i = index - 1
+        if (moveType == StepperMoveType.Absolute) {
+            _stepperTarget[i] = position
+        } else {
+            _stepperTarget[i] = _stepperPosition[i] + position
+        }
+    }
+
+    //% block="Stepper Motor $index : $action"
+    //% index.min=1 index.max=4 index.defl=1
+    //% group="Stepper Motors" weight=73
+    export function stepperAction(index: number, action: StepperAction): void {
+        let i = index - 1
+        if (action == StepperAction.Run) {
+            _stepperRunning[i] = true
+            let steps = _stepperTarget[i] - _stepperPosition[i]
+            let dir = steps > 0 ? 1 : 0
+            pins.digitalWritePin(_stepperDirPin[i], dir)
+
+            let delay = Math.floor(1000000 / _stepperSpeed[i] / 2)
+            for (let s = 0; s < Math.abs(steps); s++) {
+                if (!_stepperRunning[i]) break
+                pins.digitalWritePin(_stepperStepPin[i], 1)
+                control.waitMicros(delay)
+                pins.digitalWritePin(_stepperStepPin[i], 0)
+                control.waitMicros(delay)
+                _stepperPosition[i] += dir ? 1 : -1
+            }
+            _stepperRunning[i] = false
+        } else {
+            _stepperRunning[i] = false
+        }
+    }
+
+    //% block="Stepper Motor $index : $status"
+    //% index.min=1 index.max=4 index.defl=1
+    //% group="Stepper Motors" weight=72
+    export function stepperGetStatus(index: number, status: StepperStatus): number {
+        let i = index - 1
+        if (status == StepperStatus.Position) {
+            return _stepperPosition[i]
+        }
+        return _stepperRunning[i] ? 1 : 0
+    }
+
+
+    /********** 28BYJ-48 Stepper Motor (4-pin ULN2003) **********/
+
+    // 28BYJ-48 Motor Type
+    export enum Stepper28BYJType {
+        //% block="28BYJ-48"
+        BYJ48 = 0,
+        //% block="ULN2003"
+        ULN2003 = 1,
+        //% block="Custom"
+        Custom = 2
+    }
+
+    // 28BYJ-48 Pin Mode
+    export enum Stepper28BYJPinMode {
+        //% block="4pin"
+        Pin4 = 0,
+        //% block="2pin"
+        Pin2 = 1
+    }
+
+    // 28BYJ-48 Move Unit
+    export enum Stepper28BYJUnit {
+        //% block="Step"
+        Step = 0,
+        //% block="Degree"
+        Degree = 1,
+        //% block="Revolution"
+        Revolution = 2
+    }
+
+    // 28BYJ-48 Data Variables (max 4 motors)
+    let _28byj_in1: DigitalPin[] = [DigitalPin.P8, DigitalPin.P8, DigitalPin.P8, DigitalPin.P8]
+    let _28byj_in2: DigitalPin[] = [DigitalPin.P9, DigitalPin.P9, DigitalPin.P9, DigitalPin.P9]
+    let _28byj_in3: DigitalPin[] = [DigitalPin.P10, DigitalPin.P10, DigitalPin.P10, DigitalPin.P10]
+    let _28byj_in4: DigitalPin[] = [DigitalPin.P11, DigitalPin.P11, DigitalPin.P11, DigitalPin.P11]
+    let _28byj_rpm: number[] = [10, 10, 10, 10]
+    let _28byj_position: number[] = [0, 0, 0, 0]
+    let _28byj_target: number[] = [0, 0, 0, 0]
+    let _28byj_stepsPerRev: number = 2048  // 28BYJ-48 steps per revolution
+
+    // Half-step sequence for 28BYJ-48
+    const _28byj_sequence: number[][] = [
+        [1, 0, 0, 0],
+        [1, 1, 0, 0],
+        [0, 1, 0, 0],
+        [0, 1, 1, 0],
+        [0, 0, 1, 0],
+        [0, 0, 1, 1],
+        [0, 0, 0, 1],
+        [1, 0, 0, 1]
+    ]
+
+    /**
+     * 28BYJ-48 Stepper Motor Setup (4-pin)
+     * @param motorType Motor type
+     * @param index Motor index (1-4)
+     * @param pinMode Pin mode
+     * @param in1 IN1 pin
+     * @param in2 IN2 pin
+     * @param in3 IN3 pin
+     * @param in4 IN4 pin
+     */
+    //% block="Stepper Motor( $motorType & $index ) $pinMode Connection Pin: IN1 $in1 IN2 $in2 IN3 $in3 IN4 $in4"
+    //% motorType.defl=Stepper28BYJType.BYJ48
+    //% index.min=1 index.max=4 index.defl=1
+    //% pinMode.defl=Stepper28BYJPinMode.Pin4
+    //% in1.defl=DigitalPin.P8
+    //% in2.defl=DigitalPin.P9
+    //% in3.defl=DigitalPin.P10
+    //% in4.defl=DigitalPin.P11
+    //% group="Stepper Motors" weight=69
+    //% inlineInputMode=inline
+    export function stepper28BYJSetup(motorType: Stepper28BYJType, index: number, pinMode: Stepper28BYJPinMode, in1: DigitalPin, in2: DigitalPin, in3: DigitalPin, in4: DigitalPin): void {
+        let i = index - 1
+        _28byj_in1[i] = in1
+        _28byj_in2[i] = in2
+        _28byj_in3[i] = in3
+        _28byj_in4[i] = in4
+    }
+
+    /**
+     * 28BYJ-48 Set RPM
+     * @param index Motor index
+     * @param rpm Speed in RPM
+     */
+    //% block="Stepper Motor $index : Rotation Speed $rpm RPM"
+    //% index.min=1 index.max=4 index.defl=1
+    //% rpm.min=1 rpm.max=15 rpm.defl=10
+    //% group="Stepper Motors" weight=68
+    export function stepper28BYJSetRPM(index: number, rpm: number): void {
+        let i = index - 1
+        _28byj_rpm[i] = rpm
+    }
+
+    /**
+     * 28BYJ-48 Set Move Target
+     * @param index Motor index
+     * @param unit Move unit
+     * @param value Move value
+     */
+    //% block="Stepper Motor $index : $unit by $value Move Set"
+    //% index.min=1 index.max=4 index.defl=1
+    //% unit.defl=Stepper28BYJUnit.Step
+    //% value.defl=35
+    //% group="Stepper Motors" weight=67
+    //% inlineInputMode=inline
+    export function stepper28BYJSetMove(index: number, unit: Stepper28BYJUnit, value: number): void {
+        let i = index - 1
+        let steps = value
+
+        if (unit == Stepper28BYJUnit.Degree) {
+            steps = Math.round(value * _28byj_stepsPerRev / 360)
+        } else if (unit == Stepper28BYJUnit.Revolution) {
+            steps = Math.round(value * _28byj_stepsPerRev)
+        }
+
+        _28byj_target[i] = _28byj_position[i] + steps
+    }
+
+    /**
+     * 28BYJ-48 Move Motor
+     * @param index Motor index
+     */
+    //% block="Stepper Motor $index : Move"
+    //% index.min=1 index.max=4 index.defl=1
+    //% group="Stepper Motors" weight=66
+    export function stepper28BYJMove(index: number): void {
+        let i = index - 1
+        let stepsToMove = _28byj_target[i] - _28byj_position[i]
+        let direction = stepsToMove > 0 ? 1 : -1
+        stepsToMove = Math.abs(stepsToMove)
+
+        // Calculate delay based on RPM
+        // 28BYJ-48: 2048 steps/rev, delay = 60000000 / (rpm * 2048 * 8) microseconds
+        let delayUs = Math.floor(60000000 / (_28byj_rpm[i] * _28byj_stepsPerRev))
+
+        let seqIndex = 0
+        for (let s = 0; s < stepsToMove; s++) {
+            // Set pins according to sequence
+            pins.digitalWritePin(_28byj_in1[i], _28byj_sequence[seqIndex][0])
+            pins.digitalWritePin(_28byj_in2[i], _28byj_sequence[seqIndex][1])
+            pins.digitalWritePin(_28byj_in3[i], _28byj_sequence[seqIndex][2])
+            pins.digitalWritePin(_28byj_in4[i], _28byj_sequence[seqIndex][3])
+
+            // Next sequence step
+            if (direction > 0) {
+                seqIndex = (seqIndex + 1) % 8
+            } else {
+                seqIndex = (seqIndex + 7) % 8
+            }
+
+            _28byj_position[i] += direction
+
+            control.waitMicros(delayUs)
+        }
+
+        // Turn off all coils
+        pins.digitalWritePin(_28byj_in1[i], 0)
+        pins.digitalWritePin(_28byj_in2[i], 0)
+        pins.digitalWritePin(_28byj_in3[i], 0)
+        pins.digitalWritePin(_28byj_in4[i], 0)
+    }
+
+    /**
+     * 28BYJ-48 Stop Motor
+     * @param index Motor index
+     */
+    //% block="Stepper Motor $index : Stop"
+    //% index.min=1 index.max=4 index.defl=1
+    //% group="Stepper Motors" weight=65
+    export function stepper28BYJStop(index: number): void {
+        let i = index - 1
+        pins.digitalWritePin(_28byj_in1[i], 0)
+        pins.digitalWritePin(_28byj_in2[i], 0)
+        pins.digitalWritePin(_28byj_in3[i], 0)
+        pins.digitalWritePin(_28byj_in4[i], 0)
+        _28byj_target[i] = _28byj_position[i]
+    }
+
+    /**
+     * 28BYJ-48 Get Position
+     * @param index Motor index
+     */
+    //% block="Stepper Motor $index : Position"
+    //% index.min=1 index.max=4 index.defl=1
+    //% group="Stepper Motors" weight=64
+    export function stepper28BYJGetPosition(index: number): number {
+        return _28byj_position[index - 1]
+    }
+
+    /**
+     * 28BYJ-48 Reset Position
+     * @param index Motor index
+     */
+    //% block="Stepper Motor $index : Reset Position"
+    //% index.min=1 index.max=4 index.defl=1
+    //% group="Stepper Motors" weight=63
+    export function stepper28BYJResetPosition(index: number): void {
+        let i = index - 1
+        _28byj_position[i] = 0
+        _28byj_target[i] = 0
+    }
+
+
+    /********** L9110 모터 드라이버 **********/
+
+    // L9110 방향
+    export enum L9110Direction {
+        //% block="Clockwise"
+        Clockwise = 0,
+        //% block="Counter Clockwise"
+        CounterClockwise = 1
+    }
+
+    // L9110 핀 저장 변수 (최대 4개 모터)
+    let _l9110PinA: AnalogPin[] = [AnalogPin.P0, AnalogPin.P0, AnalogPin.P0, AnalogPin.P0]
+    let _l9110PinB: AnalogPin[] = [AnalogPin.P1, AnalogPin.P1, AnalogPin.P1, AnalogPin.P1]
+
+    /**
+     * L9110 Motor Pin Setup
+     * @param motor Motor number (1-4)
+     * @param pinA Pin A
+     * @param pinB Pin B
+     */
+    //% block="DC Motor(L9110) $motor : Pin A $pinA , Pin B $pinB Setup"
+    //% motor.min=1 motor.max=4 motor.defl=1
+    //% pinA.defl=AnalogPin.P5
+    //% pinB.defl=AnalogPin.P6
+    //% group="DC모터(L9110)" weight=105
+    //% inlineInputMode=inline
+    export function l9110SetPins(motor: number, pinA: AnalogPin, pinB: AnalogPin): void {
+        let i = motor - 1
+        _l9110PinA[i] = pinA
+        _l9110PinB[i] = pinB
+    }
+
+    /**
+     * L9110 Motor Run
+     * @param motor Motor number (1-4)
+     * @param speed Speed (0-255)
+     * @param direction Direction
+     */
+    //% block="DC Motor $motor : Speed $speed , Direction $direction Rotate"
+    //% motor.min=1 motor.max=4 motor.defl=1
+    //% speed.min=0 speed.max=255 speed.defl=150
+    //% direction.defl=L9110Direction.Clockwise
+    //% group="DC모터(L9110)" weight=104
+    //% inlineInputMode=inline
+    export function l9110Run(motor: number, speed: number, direction: L9110Direction): void {
+        let i = motor - 1
+        let pwm = Math.map(speed, 0, 255, 0, 1023)
+
+        if (direction == L9110Direction.Clockwise) {
+            pins.analogWritePin(_l9110PinA[i], pwm)
+            pins.analogWritePin(_l9110PinB[i], 0)
+        } else {
+            pins.analogWritePin(_l9110PinA[i], 0)
+            pins.analogWritePin(_l9110PinB[i], pwm)
+        }
+    }
+
+    /**
+     * L9110 Motor Stop
+     * @param motor Motor number (1-4)
+     */
+    //% block="DC Motor $motor : Stop"
+    //% motor.min=1 motor.max=4 motor.defl=1
+    //% group="DC모터(L9110)" weight=103
+    export function l9110Stop(motor: number): void {
+        let i = motor - 1
+        pins.analogWritePin(_l9110PinA[i], 0)
+        pins.analogWritePin(_l9110PinB[i], 0)
+    }
+
+
+    /********** L298N 모터 드라이버 **********/
+
+    // L298N 핀 저장 변수
+    let _l298nENA: AnalogPin = AnalogPin.P0
+    let _l298nIN1: DigitalPin = DigitalPin.P1
+    let _l298nIN2: DigitalPin = DigitalPin.P2
+    let _l298nENB: AnalogPin = AnalogPin.P3
+    let _l298nIN3: DigitalPin = DigitalPin.P4
+    let _l298nIN4: DigitalPin = DigitalPin.P5
+
+    //% block="L298N motorA pin set ENA %ena IN1 %in1 IN2 %in2"
+    //% group="DC모터(L298N)" weight=100
+    export function l298nSetPinsA(ena: AnalogPin, in1: DigitalPin, in2: DigitalPin): void {
+        _l298nENA = ena
+        _l298nIN1 = in1
+        _l298nIN2 = in2
+    }
+
+    //% block="L298N motorB pin set ENB %enb IN3 %in3 IN4 %in4"
+    //% group="DC모터(L298N)" weight=99
+    export function l298nSetPinsB(enb: AnalogPin, in3: DigitalPin, in4: DigitalPin): void {
+        _l298nENB = enb
+        _l298nIN3 = in3
+        _l298nIN4 = in4
+    }
+
+    //% block="L298N motorA speed %speed"
+    //% speed.min=-100 speed.max=100 speed.defl=0
+    //% group="DC모터(L298N)" weight=98
+    export function l298nMotorA(speed: number): void {
+        let pwm = Math.abs(speed) * 10.23
+        if (speed > 0) {
+            pins.digitalWritePin(_l298nIN1, 1)
+            pins.digitalWritePin(_l298nIN2, 0)
+        } else if (speed < 0) {
+            pins.digitalWritePin(_l298nIN1, 0)
+            pins.digitalWritePin(_l298nIN2, 1)
+        } else {
+            pins.digitalWritePin(_l298nIN1, 0)
+            pins.digitalWritePin(_l298nIN2, 0)
+        }
+        pins.analogWritePin(_l298nENA, pwm)
+    }
+
+    //% block="L298N motorB speed %speed"
+    //% speed.min=-100 speed.max=100 speed.defl=0
+    //% group="DC모터(L298N)" weight=97
+    export function l298nMotorB(speed: number): void {
+        let pwm = Math.abs(speed) * 10.23
+        if (speed > 0) {
+            pins.digitalWritePin(_l298nIN3, 1)
+            pins.digitalWritePin(_l298nIN4, 0)
+        } else if (speed < 0) {
+            pins.digitalWritePin(_l298nIN3, 0)
+            pins.digitalWritePin(_l298nIN4, 1)
+        } else {
+            pins.digitalWritePin(_l298nIN3, 0)
+            pins.digitalWritePin(_l298nIN4, 0)
+        }
+        pins.analogWritePin(_l298nENB, pwm)
+    }
+
+
+    /********** L293D 모터 드라이버 **********/
+
+    // L293D 핀 저장 변수
+    let _l293dEN1: AnalogPin = AnalogPin.P0
+    let _l293dIN1: DigitalPin = DigitalPin.P1
+    let _l293dIN2: DigitalPin = DigitalPin.P2
+    let _l293dEN2: AnalogPin = AnalogPin.P3
+    let _l293dIN3: DigitalPin = DigitalPin.P4
+    let _l293dIN4: DigitalPin = DigitalPin.P5
+
+    //% block="L293D motor1 pin set EN1 %en1 IN1 %in1 IN2 %in2"
+    //% group="DC모터(L293D)" weight=96
+    export function l293dSetPins1(en1: AnalogPin, in1: DigitalPin, in2: DigitalPin): void {
+        _l293dEN1 = en1
+        _l293dIN1 = in1
+        _l293dIN2 = in2
+    }
+
+    //% block="L293D motor2 pin set EN2 %en2 IN3 %in3 IN4 %in4"
+    //% group="DC모터(L293D)" weight=95
+    export function l293dSetPins2(en2: AnalogPin, in3: DigitalPin, in4: DigitalPin): void {
+        _l293dEN2 = en2
+        _l293dIN3 = in3
+        _l293dIN4 = in4
+    }
+
+    //% block="L293D motor1 speed %speed"
+    //% speed.min=-100 speed.max=100 speed.defl=0
+    //% group="DC모터(L293D)" weight=94
+    export function l293dMotor1(speed: number): void {
+        let pwm = Math.abs(speed) * 10.23
+        if (speed > 0) {
+            pins.digitalWritePin(_l293dIN1, 1)
+            pins.digitalWritePin(_l293dIN2, 0)
+        } else if (speed < 0) {
+            pins.digitalWritePin(_l293dIN1, 0)
+            pins.digitalWritePin(_l293dIN2, 1)
+        } else {
+            pins.digitalWritePin(_l293dIN1, 0)
+            pins.digitalWritePin(_l293dIN2, 0)
+        }
+        pins.analogWritePin(_l293dEN1, pwm)
+    }
+
+    //% block="L293D motor2 speed %speed"
+    //% speed.min=-100 speed.max=100 speed.defl=0
+    //% group="DC모터(L293D)" weight=93
+    export function l293dMotor2(speed: number): void {
+        let pwm = Math.abs(speed) * 10.23
+        if (speed > 0) {
+            pins.digitalWritePin(_l293dIN3, 1)
+            pins.digitalWritePin(_l293dIN4, 0)
+        } else if (speed < 0) {
+            pins.digitalWritePin(_l293dIN3, 0)
+            pins.digitalWritePin(_l293dIN4, 1)
+        } else {
+            pins.digitalWritePin(_l293dIN3, 0)
+            pins.digitalWritePin(_l293dIN4, 0)
+        }
+        pins.analogWritePin(_l293dEN2, pwm)
+    }
+
+
+    /********** TB6612FNG 모터 드라이버 **********/
+
+    // TB6612FNG 핀 저장 변수
+    let _tb6612PWMA: AnalogPin = AnalogPin.P0
+    let _tb6612AIN1: DigitalPin = DigitalPin.P1
+    let _tb6612AIN2: DigitalPin = DigitalPin.P2
+    let _tb6612PWMB: AnalogPin = AnalogPin.P3
+    let _tb6612BIN1: DigitalPin = DigitalPin.P4
+    let _tb6612BIN2: DigitalPin = DigitalPin.P5
+    let _tb6612STBY: DigitalPin = DigitalPin.P6
+
+    //% block="TB6612FNG pin set PWMA %pwma AIN1 %ain1 AIN2 %ain2 STBY %stby"
+    //% group="듀얼 H-브리지 모터(TB6612FNG)" weight=92
+    export function tb6612SetPinsA(pwma: AnalogPin, ain1: DigitalPin, ain2: DigitalPin, stby: DigitalPin): void {
+        _tb6612PWMA = pwma
+        _tb6612AIN1 = ain1
+        _tb6612AIN2 = ain2
+        _tb6612STBY = stby
+        pins.digitalWritePin(_tb6612STBY, 1)
+    }
+
+    //% block="TB6612FNG motorB pin set PWMB %pwmb BIN1 %bin1 BIN2 %bin2"
+    //% group="듀얼 H-브리지 모터(TB6612FNG)" weight=91
+    export function tb6612SetPinsB(pwmb: AnalogPin, bin1: DigitalPin, bin2: DigitalPin): void {
+        _tb6612PWMB = pwmb
+        _tb6612BIN1 = bin1
+        _tb6612BIN2 = bin2
+    }
+
+    //% block="TB6612FNG motorA speed %speed"
+    //% speed.min=-100 speed.max=100 speed.defl=0
+    //% group="듀얼 H-브리지 모터(TB6612FNG)" weight=90
+    export function tb6612MotorA(speed: number): void {
+        let pwm = Math.abs(speed) * 10.23
+        if (speed > 0) {
+            pins.digitalWritePin(_tb6612AIN1, 1)
+            pins.digitalWritePin(_tb6612AIN2, 0)
+        } else if (speed < 0) {
+            pins.digitalWritePin(_tb6612AIN1, 0)
+            pins.digitalWritePin(_tb6612AIN2, 1)
+        } else {
+            pins.digitalWritePin(_tb6612AIN1, 0)
+            pins.digitalWritePin(_tb6612AIN2, 0)
+        }
+        pins.analogWritePin(_tb6612PWMA, pwm)
+    }
+
+    //% block="TB6612FNG motorB speed %speed"
+    //% speed.min=-100 speed.max=100 speed.defl=0
+    //% group="듀얼 H-브리지 모터(TB6612FNG)" weight=89
+    export function tb6612MotorB(speed: number): void {
+        let pwm = Math.abs(speed) * 10.23
+        if (speed > 0) {
+            pins.digitalWritePin(_tb6612BIN1, 1)
+            pins.digitalWritePin(_tb6612BIN2, 0)
+        } else if (speed < 0) {
+            pins.digitalWritePin(_tb6612BIN1, 0)
+            pins.digitalWritePin(_tb6612BIN2, 1)
+        } else {
+            pins.digitalWritePin(_tb6612BIN1, 0)
+            pins.digitalWritePin(_tb6612BIN2, 0)
+        }
+        pins.analogWritePin(_tb6612PWMB, pwm)
+    }
+
+
+    /********** DRV8833 모터 드라이버 **********/
+
+    // DRV8833 핀 저장 변수
+    let _drv8833AIN1: AnalogPin = AnalogPin.P0
+    let _drv8833AIN2: AnalogPin = AnalogPin.P1
+    let _drv8833BIN1: AnalogPin = AnalogPin.P2
+    let _drv8833BIN2: AnalogPin = AnalogPin.P3
+
+    //% block="DRV8833 motorA pin set AIN1 %ain1 AIN2 %ain2"
+    //% group="듀얼 H-브리지 DC 모터(DRV8833)" weight=88
+    export function drv8833SetPinsA(ain1: AnalogPin, ain2: AnalogPin): void {
+        _drv8833AIN1 = ain1
+        _drv8833AIN2 = ain2
+    }
+
+    //% block="DRV8833 motorB pin set BIN1 %bin1 BIN2 %bin2"
+    //% group="듀얼 H-브리지 DC 모터(DRV8833)" weight=87
+    export function drv8833SetPinsB(bin1: AnalogPin, bin2: AnalogPin): void {
+        _drv8833BIN1 = bin1
+        _drv8833BIN2 = bin2
+    }
+
+    //% block="DRV8833 motorA speed %speed"
+    //% speed.min=-100 speed.max=100 speed.defl=0
+    //% group="듀얼 H-브리지 DC 모터(DRV8833)" weight=86
+    export function drv8833MotorA(speed: number): void {
+        let pwm = Math.abs(speed) * 10.23
+        if (speed > 0) {
+            pins.analogWritePin(_drv8833AIN1, pwm)
+            pins.analogWritePin(_drv8833AIN2, 0)
+        } else if (speed < 0) {
+            pins.analogWritePin(_drv8833AIN1, 0)
+            pins.analogWritePin(_drv8833AIN2, pwm)
+        } else {
+            pins.analogWritePin(_drv8833AIN1, 0)
+            pins.analogWritePin(_drv8833AIN2, 0)
+        }
+    }
+
+    //% block="DRV8833 motorB speed %speed"
+    //% speed.min=-100 speed.max=100 speed.defl=0
+    //% group="듀얼 H-브리지 DC 모터(DRV8833)" weight=85
+    export function drv8833MotorB(speed: number): void {
+        let pwm = Math.abs(speed) * 10.23
+        if (speed > 0) {
+            pins.analogWritePin(_drv8833BIN1, pwm)
+            pins.analogWritePin(_drv8833BIN2, 0)
+        } else if (speed < 0) {
+            pins.analogWritePin(_drv8833BIN1, 0)
+            pins.analogWritePin(_drv8833BIN2, pwm)
+        } else {
+            pins.analogWritePin(_drv8833BIN1, 0)
+            pins.analogWritePin(_drv8833BIN2, 0)
+        }
     }
 
 
