@@ -4,8 +4,218 @@
  */
 
 //% weight=1040 color=#F75ACF icon="\uf1eb" block="07. Communications"
-//% groups="['Infrared', 'MFRC522', 'PN532', 'GPS', 'nRF24L01', 'LoRa']"
+//% groups="['RF433MHz', 'Infrared', 'MFRC522', 'PN532', 'GPS', 'nRF24L01', 'LoRa']"
 namespace Communications07 {
+
+
+    /********** RF433MHz Wireless Module **********/
+
+    // RF433MHz is a simple low-cost wireless module
+    // Typically uses ASK/OOK modulation
+    // Range: ~20-200m depending on environment
+
+    // RF433MHz variables
+    let _rf433TxPin: DigitalPin = DigitalPin.P12
+    let _rf433RxPin: DigitalPin = DigitalPin.P11
+    let _rf433BitTime: number = 500  // microseconds per bit (2000 bps default)
+    let _rf433RxBuffer: string = ""
+    let _rf433DataReady: boolean = false
+    let _rf433Receiving: boolean = false
+
+    /**
+     * RF433MHz transmit data on specified pin
+     * @param pin TX pin
+     * @param data data to transmit
+     */
+    //% block="RF433MHz TX pin %pin , %data data transmit"
+    //% pin.defl=DigitalPin.P12
+    //% data.defl="Gorillacell"
+    //% group="RF433MHz" weight=99
+    //% inlineInputMode=inline
+    export function rf433Transmit(pin: DigitalPin, data: string): void {
+        _rf433TxPin = pin
+
+        // Send preamble (sync pattern)
+        for (let i = 0; i < 8; i++) {
+            pins.digitalWritePin(pin, 1)
+            control.waitMicros(_rf433BitTime)
+            pins.digitalWritePin(pin, 0)
+            control.waitMicros(_rf433BitTime)
+        }
+
+        // Send start bits (1100)
+        pins.digitalWritePin(pin, 1)
+        control.waitMicros(_rf433BitTime)
+        pins.digitalWritePin(pin, 1)
+        control.waitMicros(_rf433BitTime)
+        pins.digitalWritePin(pin, 0)
+        control.waitMicros(_rf433BitTime)
+        pins.digitalWritePin(pin, 0)
+        control.waitMicros(_rf433BitTime)
+
+        // Send length byte
+        rf433SendByte(pin, data.length)
+
+        // Send data bytes
+        for (let i = 0; i < data.length; i++) {
+            rf433SendByte(pin, data.charCodeAt(i))
+        }
+
+        // Send checksum
+        let checksum = data.length
+        for (let i = 0; i < data.length; i++) {
+            checksum ^= data.charCodeAt(i)
+        }
+        rf433SendByte(pin, checksum)
+
+        // End transmission
+        pins.digitalWritePin(pin, 0)
+    }
+
+    /**
+     * RF433MHz receiver setup
+     * @param pin RX pin
+     * @param baudRate baud rate (bits per second)
+     */
+    //% block="RF433MHz RX pin %pin , baud rate %baudRate setup"
+    //% pin.defl=DigitalPin.P11
+    //% baudRate.defl=2000
+    //% group="RF433MHz" weight=98
+    //% inlineInputMode=inline
+    export function rf433ReceiverSetup(pin: DigitalPin, baudRate: number): void {
+        _rf433RxPin = pin
+        _rf433BitTime = Math.floor(1000000 / baudRate)  // Convert to microseconds
+        _rf433RxBuffer = ""
+        _rf433DataReady = false
+        _rf433Receiving = false
+
+        pins.setPull(pin, PinPullMode.PullDown)
+    }
+
+    /**
+     * RF433MHz 1. Prepare to store received data in buffer
+     */
+    //% block="RF433MHz 1. prepare to store received data in buffer"
+    //% group="RF433MHz" weight=97
+    export function rf433PrepareReceive(): void {
+        _rf433RxBuffer = ""
+        _rf433DataReady = false
+        _rf433Receiving = true
+    }
+
+    /**
+     * RF433MHz 2. Check if data is received
+     */
+    //% block="RF433MHz 2. is data received?"
+    //% group="RF433MHz" weight=96
+    export function rf433DataAvailable(): boolean {
+        if (!_rf433Receiving) return false
+
+        // Check for sync pattern
+        let syncCount = 0
+        let lastState = 0
+        let startTime = input.runningTimeMicros()
+
+        // Look for preamble pattern (alternating 1s and 0s)
+        while (input.runningTimeMicros() - startTime < 50000) {  // 50ms timeout
+            let currentState = pins.digitalReadPin(_rf433RxPin)
+            if (currentState != lastState) {
+                syncCount++
+                lastState = currentState
+                if (syncCount >= 12) {
+                    // Found sync pattern, look for start bits
+                    control.waitMicros(_rf433BitTime / 2)
+
+                    // Read start bits (expecting 1100)
+                    let b1 = pins.digitalReadPin(_rf433RxPin)
+                    control.waitMicros(_rf433BitTime)
+                    let b2 = pins.digitalReadPin(_rf433RxPin)
+                    control.waitMicros(_rf433BitTime)
+                    let b3 = pins.digitalReadPin(_rf433RxPin)
+                    control.waitMicros(_rf433BitTime)
+                    let b4 = pins.digitalReadPin(_rf433RxPin)
+
+                    if (b1 == 1 && b2 == 1 && b3 == 0 && b4 == 0) {
+                        _rf433DataReady = true
+                        return true
+                    }
+                }
+            }
+            control.waitMicros(10)
+        }
+
+        return false
+    }
+
+    /**
+     * RF433MHz 3. Store received data to buffer
+     */
+    //% block="RF433MHz 3. store received data to buffer"
+    //% group="RF433MHz" weight=95
+    export function rf433StoreToBuffer(): void {
+        if (!_rf433DataReady) return
+
+        control.waitMicros(_rf433BitTime)
+
+        // Read length byte
+        let length = rf433ReadByte(_rf433RxPin)
+        if (length > 32) length = 32  // Limit to prevent overflow
+
+        // Read data bytes
+        let data = ""
+        let checksum = length
+        for (let i = 0; i < length; i++) {
+            let byte = rf433ReadByte(_rf433RxPin)
+            data += String.fromCharCode(byte)
+            checksum ^= byte
+        }
+
+        // Read and verify checksum
+        let rxChecksum = rf433ReadByte(_rf433RxPin)
+        if (rxChecksum == checksum) {
+            _rf433RxBuffer = data
+        } else {
+            _rf433RxBuffer = ""  // Invalid data
+        }
+
+        _rf433DataReady = false
+        _rf433Receiving = false
+    }
+
+    /**
+     * RF433MHz read received data
+     */
+    //% block="RF433MHz: read received data"
+    //% group="RF433MHz" weight=94
+    export function rf433ReadData(): string {
+        let data = _rf433RxBuffer
+        _rf433RxBuffer = ""
+        return data
+    }
+
+    // Internal function: send one byte
+    function rf433SendByte(pin: DigitalPin, byte: number): void {
+        for (let bit = 0; bit < 8; bit++) {
+            if (byte & (1 << (7 - bit))) {
+                pins.digitalWritePin(pin, 1)
+            } else {
+                pins.digitalWritePin(pin, 0)
+            }
+            control.waitMicros(_rf433BitTime)
+        }
+    }
+
+    // Internal function: read one byte
+    function rf433ReadByte(pin: DigitalPin): number {
+        let byte = 0
+        for (let bit = 0; bit < 8; bit++) {
+            control.waitMicros(_rf433BitTime)
+            if (pins.digitalReadPin(pin) == 1) {
+                byte |= (1 << (7 - bit))
+            }
+        }
+        return byte
+    }
 
 
 

@@ -4,7 +4,7 @@
  */
 
 //% weight=1080 color=#FF6F00 icon="\uf0e7" block="03. Sensors"
-//% groups="['초음파(HC-SR04)', '온습도(DHT11/DHT22)', '물온도(DS18B20)', '무게(HX711)', 'Rotary Encoder', '미세먼지(PMS)', 'CO2센서(MHZ19)', '전기전도도(TDS)', 'pH', '탁도(Turbidity)', 'UV Sensor', '온도(LM35)', '미세먼지(GP2Y0A21YK)', '초음파(US-100)', '빛(TEMT6000)', '가스(MQ-2)', '가스(MQ-135)', 'CO2센서(CCS811)', 'Joystick', 'Keypad', 'Button', 'Potentiometer', 'Other Sensors']"
+//% groups="['초음파(HC-SR04)', '온습도(DHT11/DHT22)', '물온도(DS18B20)', '무게(HX711)', 'I2C 무게센서', '서미스터(NTC)', '지문센서', 'Rotary Encoder', '미세먼지(PMS)', 'CO2센서(MHZ19)', '전기전도도(TDS)', 'pH', '탁도(Turbidity)', 'UV Sensor', '온도(LM35)', '미세먼지(GP2Y0A21YK)', '초음파(US-100)', '빛(TEMT6000)', '가스(MQ-2)', '가스(MQ-135)', 'CO2센서(CCS811)', 'Joystick', 'Keypad', 'Button', 'Potentiometer', 'Other Sensors']"
 namespace Sensors03 {
 
 
@@ -1072,6 +1072,625 @@ namespace Sensors03 {
         }
 
         return value
+    }
+
+
+    /********** I2C 무게 센서 (NAU7802 등) **********/
+
+    // I2C 기반 무게 센서 (NAU7802, SparkFun Qwiic Scale 등)
+    // 24비트 ADC로 고정밀 무게 측정 지원
+
+    // I2C 무게센서 데이터 바이트 타입
+    export enum I2CWeightByte {
+        //% block="0 (상태)"
+        Status = 0,
+        //% block="1 (데이터 High)"
+        DataHigh = 1,
+        //% block="2 (데이터 Mid)"
+        DataMid = 2,
+        //% block="3 (데이터 Low)"
+        DataLow = 3
+    }
+
+    // I2C 무게센서 상태 변수
+    let _i2cWeightAddr: number = 0x2A  // NAU7802 기본 주소
+    let _i2cWeightOffset: number = 0
+    let _i2cWeightScale: number = 1
+    let _i2cWeightInitialized: boolean = false
+
+    /**
+     * I2C 무게센서 주소 설정
+     * @param addr I2C 주소 (기본값: 0x2A = 42, 또는 99 등)
+     */
+    //% block="I2C 무게센서 설정 주소 $addr"
+    //% addr.defl=99
+    //% group="I2C 무게센서" weight=198
+    export function i2cWeightSetAddress(addr: number): void {
+        _i2cWeightAddr = addr
+        _i2cWeightInitialized = false
+
+        // 센서 초기화 시도
+        try {
+            // PU_CTRL 레지스터 설정 (전원 켜기)
+            pins.i2cWriteNumber(_i2cWeightAddr, 0x0001, NumberFormat.UInt16BE)
+            basic.pause(10)
+
+            // 디지털 파워 켜기
+            pins.i2cWriteNumber(_i2cWeightAddr, 0x0002, NumberFormat.UInt16BE)
+            basic.pause(10)
+
+            // ADC 시작
+            pins.i2cWriteNumber(_i2cWeightAddr, 0x0006, NumberFormat.UInt16BE)
+            basic.pause(100)
+
+            _i2cWeightInitialized = true
+        } catch {
+            _i2cWeightInitialized = false
+        }
+    }
+
+    /**
+     * I2C 센서에서 무게 읽기
+     * @returns 보정된 무게 값
+     */
+    //% block="I2C 센서에서 무게 읽기"
+    //% group="I2C 무게센서" weight=197
+    export function i2cWeightRead(): number {
+        let raw = i2cWeightReadRaw24bit()
+        return (raw - _i2cWeightOffset) / _i2cWeightScale
+    }
+
+    /**
+     * I2C 무게센서 사용 가능 여부 확인
+     * @returns 센서가 준비되면 true
+     */
+    //% block="I2C 무게센서가 사용가능함"
+    //% group="I2C 무게센서" weight=196
+    export function i2cWeightIsAvailable(): boolean {
+        if (!_i2cWeightInitialized) {
+            return false
+        }
+
+        try {
+            // 상태 레지스터 읽기
+            pins.i2cWriteNumber(_i2cWeightAddr, 0x00, NumberFormat.UInt8BE)
+            let status = pins.i2cReadNumber(_i2cWeightAddr, NumberFormat.UInt8BE)
+            // CR (Conversion Ready) 비트 확인
+            return (status & 0x20) != 0
+        } catch {
+            return false
+        }
+    }
+
+    /**
+     * I2C 센서에서 원시 데이터 바이트 읽기
+     * @param byteType 읽을 바이트 타입
+     * @returns 해당 바이트 값
+     */
+    //% block="I2C 센서에서 원시 데이터 byte Byte $byteType 읽기"
+    //% byteType.defl=I2CWeightByte.Status
+    //% group="I2C 무게센서" weight=195
+    export function i2cWeightReadByte(byteType: I2CWeightByte): number {
+        try {
+            if (byteType == I2CWeightByte.Status) {
+                // 상태 레지스터 (0x00)
+                pins.i2cWriteNumber(_i2cWeightAddr, 0x00, NumberFormat.UInt8BE)
+                return pins.i2cReadNumber(_i2cWeightAddr, NumberFormat.UInt8BE)
+            } else {
+                // ADC 데이터 레지스터 (0x12, 0x13, 0x14)
+                let regAddr = 0x12 + (byteType - 1)
+                pins.i2cWriteNumber(_i2cWeightAddr, regAddr, NumberFormat.UInt8BE)
+                return pins.i2cReadNumber(_i2cWeightAddr, NumberFormat.UInt8BE)
+            }
+        } catch {
+            return -1
+        }
+    }
+
+    /**
+     * I2C 무게센서 영점 조정 (Tare)
+     * @param samples 평균을 낼 샘플 수
+     */
+    //% block="I2C 무게센서 영점 조정 샘플수 $samples"
+    //% samples.defl=10
+    //% group="I2C 무게센서" weight=194
+    export function i2cWeightTare(samples: number): void {
+        let sum = 0
+        for (let i = 0; i < samples; i++) {
+            sum += i2cWeightReadRaw24bit()
+            basic.pause(50)
+        }
+        _i2cWeightOffset = Math.floor(sum / samples)
+    }
+
+    /**
+     * I2C 무게센서 스케일 설정
+     * @param scale 스케일 값 (예: 알려진 무게로 나눈 원시 값)
+     */
+    //% block="I2C 무게센서 스케일 설정 $scale"
+    //% scale.defl=1
+    //% group="I2C 무게센서" weight=193
+    export function i2cWeightSetScale(scale: number): void {
+        _i2cWeightScale = scale
+    }
+
+    /**
+     * I2C 무게센서 24비트 원시 값 읽기
+     * @returns 24비트 ADC 값
+     */
+    //% block="I2C 무게센서 원시값(24bit) 읽기"
+    //% group="I2C 무게센서" weight=192
+    export function i2cWeightReadRaw24bit(): number {
+        try {
+            // 변환 완료 대기
+            let timeout = 100
+            while (!i2cWeightIsAvailable() && timeout > 0) {
+                basic.pause(10)
+                timeout--
+            }
+
+            // ADC 출력 레지스터 읽기 (0x12 ~ 0x14, 3바이트)
+            pins.i2cWriteNumber(_i2cWeightAddr, 0x12, NumberFormat.UInt8BE)
+            let buf = pins.i2cReadBuffer(_i2cWeightAddr, 3)
+
+            let value = (buf[0] << 16) | (buf[1] << 8) | buf[2]
+
+            // 24비트 부호 있는 정수 처리
+            if (value & 0x800000) {
+                value = value - 0x1000000
+            }
+
+            return value
+        } catch {
+            return 0
+        }
+    }
+
+    /**
+     * I2C 무게센서 게인 설정
+     * @param gain 게인 값 (1, 2, 4, 8, 16, 32, 64, 128)
+     */
+    //% block="I2C 무게센서 게인 설정 $gain"
+    //% gain.defl=128
+    //% group="I2C 무게센서" weight=191
+    export function i2cWeightSetGain(gain: number): void {
+        let gainBits = 7  // 기본 128
+        if (gain <= 1) gainBits = 0
+        else if (gain <= 2) gainBits = 1
+        else if (gain <= 4) gainBits = 2
+        else if (gain <= 8) gainBits = 3
+        else if (gain <= 16) gainBits = 4
+        else if (gain <= 32) gainBits = 5
+        else if (gain <= 64) gainBits = 6
+        else gainBits = 7
+
+        try {
+            // CTRL1 레지스터 (0x01)에 게인 설정
+            let regValue = (gainBits << 4) | 0x04  // VLDO 3.0V
+            pins.i2cWriteNumber(_i2cWeightAddr, 0x01, NumberFormat.UInt8BE)
+            pins.i2cWriteNumber(_i2cWeightAddr, regValue, NumberFormat.UInt8BE)
+        } catch {
+            // 에러 무시
+        }
+    }
+
+
+    /********** 서미스터 온도 센서 (NTC Thermistor) **********/
+
+    // NTC 서미스터는 온도에 따라 저항이 변하는 센서입니다.
+    // Steinhart-Hart 방정식 또는 Beta 파라미터 방정식을 사용하여 온도를 계산합니다.
+
+    // 서미스터 상태 변수
+    let _thermistorPin: AnalogPin = AnalogPin.P0
+    let _thermistorNominal: number = 10000      // 공칭 저항 (25°C에서의 저항값)
+    let _thermistorBeta: number = 3950          // 베타 계수
+    let _thermistorSeriesR: number = 10000      // 직렬 저항값
+
+    /**
+     * 서미스터 온도 센서 설정
+     * @param pin 아날로그 핀
+     * @param nominalR 공칭 저항 (25°C에서의 저항, 보통 10000Ω)
+     * @param beta 베타 계수 (보통 3950)
+     * @param seriesR 직렬 저항 (보통 10000Ω)
+     */
+    //% block="서미스터 온도 센서: 아날로그 핀 $pin , 공칭 저항 $nominalR Ω, 베타 계수 $beta , 직렬 저항 $seriesR Ω 설정"
+    //% pin.defl=AnalogPin.P0
+    //% nominalR.defl=10000
+    //% beta.defl=3950
+    //% seriesR.defl=10000
+    //% group="서미스터(NTC)" weight=189
+    //% inlineInputMode=inline
+    export function thermistorInit(pin: AnalogPin, nominalR: number, beta: number, seriesR: number): void {
+        _thermistorPin = pin
+        _thermistorNominal = nominalR
+        _thermistorBeta = beta
+        _thermistorSeriesR = seriesR
+    }
+
+    /**
+     * 서미스터 온도 센서 온도 측정
+     * @param unit 온도 단위
+     * @returns 온도 값
+     */
+    //% block="서미스터 온도 센서 온도 측정 ( $unit )"
+    //% unit.defl=TempUnit.Celsius
+    //% group="서미스터(NTC)" weight=188
+    export function thermistorReadTemp(unit: TempUnit): number {
+        let adcValue = pins.analogReadPin(_thermistorPin)
+        
+        // ADC 값으로부터 저항 계산
+        // 회로: Vcc -- [직렬저항] -- [ADC] -- [서미스터] -- GND
+        let resistance = _thermistorSeriesR * adcValue / (1023 - adcValue)
+        
+        // Steinhart-Hart Beta 파라미터 방정식
+        // 1/T = 1/T0 + (1/B) * ln(R/R0)
+        // T0 = 298.15K (25°C), R0 = 공칭 저항
+        let steinhart = Math.log(resistance / _thermistorNominal)
+        steinhart = steinhart / _thermistorBeta
+        steinhart = steinhart + (1.0 / 298.15)
+        let tempK = 1.0 / steinhart
+        let tempC = tempK - 273.15
+        
+        if (unit == TempUnit.Fahrenheit) {
+            return tempC * 9 / 5 + 32
+        }
+        return tempC
+    }
+
+    /**
+     * 서미스터 온도 센서 원본 값 (ADC 값)
+     * @returns ADC 원본 값 (0~1023)
+     */
+    //% block="서미스터 온도 센서 원본 값"
+    //% group="서미스터(NTC)" weight=187
+    export function thermistorReadRaw(): number {
+        return pins.analogReadPin(_thermistorPin)
+    }
+
+    /**
+     * 서미스터 온도 센서 저항 값
+     * @returns 계산된 저항 값 (Ω)
+     */
+    //% block="서미스터 온도 센서 저항 값"
+    //% group="서미스터(NTC)" weight=186
+    export function thermistorReadResistance(): number {
+        let adcValue = pins.analogReadPin(_thermistorPin)
+        if (adcValue >= 1023) return 0
+        if (adcValue <= 0) return 999999
+        
+        // 저항 계산
+        let resistance = _thermistorSeriesR * adcValue / (1023 - adcValue)
+        return Math.round(resistance)
+    }
+
+
+    /********** 지문 센서 (AS608/R307/FPM10A) **********/
+
+    // 지문 센서는 시리얼 통신으로 동작합니다.
+    // AS608, R307, FPM10A 등 호환 센서 지원
+
+    // 시리얼 타입
+    export enum FingerprintSerial {
+        //% block="소프트웨어 시리얼"
+        Software = 0,
+        //% block="하드웨어 시리얼"
+        Hardware = 1
+    }
+
+    // 지문 등록 과정
+    export enum FingerprintEnrollStep {
+        //% block="이미지 가져오기"
+        GetImage = 1,
+        //% block="이미지 변환"
+        Image2Tz = 2,
+        //% block="모델 생성"
+        CreateModel = 3,
+        //% block="저장"
+        Store = 4
+    }
+
+    // 지문 인식 모드
+    export enum FingerprintSearchMode {
+        //% block="빠른"
+        Fast = 0,
+        //% block="정확한"
+        Accurate = 1
+    }
+
+    // 지문 인식 결과 타입
+    export enum FingerprintResult {
+        //% block="지문 ID"
+        FingerID = 0,
+        //% block="일치 점수"
+        Confidence = 1,
+        //% block="상태 코드"
+        StatusCode = 2
+    }
+
+    // 지문 데이터베이스 동작
+    export enum FingerprintDBAction {
+        //% block="ID 삭제"
+        Delete = 0,
+        //% block="전체 삭제"
+        Empty = 1,
+        //% block="개수 확인"
+        Count = 2
+    }
+
+    // LED 제어
+    export enum FingerprintLED {
+        //% block="켜기"
+        On = 1,
+        //% block="끄기"
+        Off = 0
+    }
+
+    // 지문 센서 상태 변수
+    let _fpSerialType: FingerprintSerial = FingerprintSerial.Software
+    let _fpRxPin: SerialPin = SerialPin.P2
+    let _fpTxPin: SerialPin = SerialPin.P3
+    let _fpBaudRate: BaudRate = BaudRate.BaudRate57600
+    let _fpFingerID: number = -1
+    let _fpConfidence: number = 0
+    let _fpStatusCode: number = 0
+    let _fpInitialized: boolean = false
+
+    // 지문 센서 패킷 상수
+    const FP_HEADER = 0xEF01
+    const FP_ADDRESS = 0xFFFFFFFF
+    const FP_CMD_PACKET = 0x01
+    const FP_DATA_PACKET = 0x02
+    const FP_ACK_PACKET = 0x07
+    const FP_END_PACKET = 0x08
+
+    /**
+     * 지문 센서 설정
+     * @param serialType 시리얼 타입
+     * @param rx RX 핀
+     * @param tx TX 핀
+     * @param baudRate 통신 속도
+     */
+    //% block="지문 센서 설정: 시리얼 $serialType , RX핀 $rx , TX핀 $tx , 통신 속도 $baudRate"
+    //% serialType.defl=FingerprintSerial.Software
+    //% rx.defl=SerialPin.P2
+    //% tx.defl=SerialPin.P3
+    //% baudRate.defl=57600
+    //% group="지문센서" weight=185
+    //% inlineInputMode=inline
+    export function fingerprintInit(serialType: FingerprintSerial, rx: SerialPin, tx: SerialPin, baudRate: number): void {
+        _fpSerialType = serialType
+        _fpRxPin = rx
+        _fpTxPin = tx
+        
+        // BaudRate 변환
+        if (baudRate == 9600) _fpBaudRate = BaudRate.BaudRate9600
+        else if (baudRate == 19200) _fpBaudRate = BaudRate.BaudRate19200
+        else if (baudRate == 38400) _fpBaudRate = BaudRate.BaudRate38400
+        else if (baudRate == 57600) _fpBaudRate = BaudRate.BaudRate57600
+        else if (baudRate == 115200) _fpBaudRate = BaudRate.BaudRate115200
+        else _fpBaudRate = BaudRate.BaudRate57600
+        
+        serial.redirect(tx, rx, _fpBaudRate)
+        basic.pause(100)
+        _fpInitialized = true
+    }
+
+    /**
+     * 지문 등록 과정
+     * @param step 등록 단계
+     * @param id 지문 ID (1~127)
+     * @returns 성공 여부
+     */
+    //% block="지문 등록 과정 $step , ID 번호: $id"
+    //% step.defl=FingerprintEnrollStep.GetImage
+    //% id.min=1 id.max=127 id.defl=1
+    //% group="지문센서" weight=184
+    export function fingerprintEnroll(step: FingerprintEnrollStep, id: number): boolean {
+        let cmd: number[] = []
+        
+        switch (step) {
+            case FingerprintEnrollStep.GetImage:
+                // 이미지 가져오기 (0x01)
+                cmd = [0x01]
+                break
+            case FingerprintEnrollStep.Image2Tz:
+                // 이미지 변환 (0x02), 버퍼 1 또는 2
+                cmd = [0x02, 0x01]
+                break
+            case FingerprintEnrollStep.CreateModel:
+                // 모델 생성 (0x05)
+                cmd = [0x05]
+                break
+            case FingerprintEnrollStep.Store:
+                // 저장 (0x06), 버퍼 1, ID
+                cmd = [0x06, 0x01, (id >> 8) & 0xFF, id & 0xFF]
+                break
+        }
+        
+        _fpStatusCode = fpSendCommand(cmd)
+        return _fpStatusCode == 0x00
+    }
+
+    /**
+     * 지문 인식 모드 검색
+     * @param mode 검색 모드
+     * @returns 성공 여부
+     */
+    //% block="지문 인식 모드: $mode 검색"
+    //% mode.defl=FingerprintSearchMode.Fast
+    //% group="지문센서" weight=183
+    export function fingerprintSearch(mode: FingerprintSearchMode): boolean {
+        // 1. 이미지 가져오기
+        _fpStatusCode = fpSendCommand([0x01])
+        if (_fpStatusCode != 0x00) {
+            _fpFingerID = -1
+            _fpConfidence = 0
+            return false
+        }
+        
+        // 2. 이미지 변환
+        _fpStatusCode = fpSendCommand([0x02, 0x01])
+        if (_fpStatusCode != 0x00) {
+            _fpFingerID = -1
+            _fpConfidence = 0
+            return false
+        }
+        
+        // 3. 검색 (0x04), 버퍼1, 시작ID(0), 끝ID(127)
+        let searchCmd = [0x04, 0x01, 0x00, 0x00, 0x00, 0x7F]
+        let response = fpSendCommandWithResponse(searchCmd)
+        
+        if (response.length >= 4 && response[0] == 0x00) {
+            _fpFingerID = (response[1] << 8) | response[2]
+            _fpConfidence = (response[3] << 8) | (response.length > 4 ? response[4] : 0)
+            _fpStatusCode = 0x00
+            return true
+        }
+        
+        _fpFingerID = -1
+        _fpConfidence = 0
+        _fpStatusCode = response.length > 0 ? response[0] : 0xFF
+        return false
+    }
+
+    /**
+     * 지문 인식 결과
+     * @param resultType 결과 타입
+     * @returns 결과 값
+     */
+    //% block="지문 인식 결과: $resultType"
+    //% resultType.defl=FingerprintResult.FingerID
+    //% group="지문센서" weight=182
+    export function fingerprintGetResult(resultType: FingerprintResult): number {
+        switch (resultType) {
+            case FingerprintResult.FingerID:
+                return _fpFingerID
+            case FingerprintResult.Confidence:
+                return _fpConfidence
+            case FingerprintResult.StatusCode:
+                return _fpStatusCode
+            default:
+                return -1
+        }
+    }
+
+    /**
+     * 지문 데이터베이스 관리
+     * @param action 동작
+     * @param id ID 번호 (삭제 시 사용)
+     * @returns 결과 값
+     */
+    //% block="지문 데이터베이스 $action , ID: $id"
+    //% action.defl=FingerprintDBAction.Delete
+    //% id.min=1 id.max=127 id.defl=1
+    //% group="지문센서" weight=181
+    export function fingerprintDatabase(action: FingerprintDBAction, id: number): number {
+        let cmd: number[] = []
+        
+        switch (action) {
+            case FingerprintDBAction.Delete:
+                // 삭제 (0x0C), ID, 개수(1)
+                cmd = [0x0C, (id >> 8) & 0xFF, id & 0xFF, 0x00, 0x01]
+                _fpStatusCode = fpSendCommand(cmd)
+                return _fpStatusCode == 0x00 ? 1 : 0
+                
+            case FingerprintDBAction.Empty:
+                // 전체 삭제 (0x0D)
+                cmd = [0x0D]
+                _fpStatusCode = fpSendCommand(cmd)
+                return _fpStatusCode == 0x00 ? 1 : 0
+                
+            case FingerprintDBAction.Count:
+                // 개수 확인 (0x1D)
+                cmd = [0x1D]
+                let response = fpSendCommandWithResponse(cmd)
+                if (response.length >= 3 && response[0] == 0x00) {
+                    return (response[1] << 8) | response[2]
+                }
+                return 0
+        }
+        return 0
+    }
+
+    /**
+     * 지문 센서 LED 제어
+     * @param state LED 상태
+     */
+    //% block="지문 센서 LED 제어 $state"
+    //% state.defl=FingerprintLED.On
+    //% group="지문센서" weight=180
+    export function fingerprintLED(state: FingerprintLED): void {
+        // LED 제어 (0x35 또는 센서별 다름)
+        // 일부 센서는 별도 LED 핀 사용
+        let cmd = [0x35, state == FingerprintLED.On ? 0x01 : 0x00, 0x00, 0x00, 0x00]
+        fpSendCommand(cmd)
+    }
+
+    // 지문 센서 명령 전송 (내부 함수)
+    function fpSendCommand(cmd: number[]): number {
+        let response = fpSendCommandWithResponse(cmd)
+        return response.length > 0 ? response[0] : 0xFF
+    }
+
+    // 지문 센서 명령 전송 및 응답 수신 (내부 함수)
+    function fpSendCommandWithResponse(cmd: number[]): number[] {
+        // 패킷 구성
+        let packet: number[] = []
+        
+        // 헤더 (2바이트)
+        packet.push((FP_HEADER >> 8) & 0xFF)
+        packet.push(FP_HEADER & 0xFF)
+        
+        // 주소 (4바이트)
+        packet.push((FP_ADDRESS >> 24) & 0xFF)
+        packet.push((FP_ADDRESS >> 16) & 0xFF)
+        packet.push((FP_ADDRESS >> 8) & 0xFF)
+        packet.push(FP_ADDRESS & 0xFF)
+        
+        // 패킷 타입
+        packet.push(FP_CMD_PACKET)
+        
+        // 길이 (명령 + 체크섬 2바이트)
+        let length = cmd.length + 2
+        packet.push((length >> 8) & 0xFF)
+        packet.push(length & 0xFF)
+        
+        // 명령 데이터
+        for (let b of cmd) {
+            packet.push(b)
+        }
+        
+        // 체크섬 계산
+        let checksum = FP_CMD_PACKET + ((length >> 8) & 0xFF) + (length & 0xFF)
+        for (let b of cmd) {
+            checksum += b
+        }
+        packet.push((checksum >> 8) & 0xFF)
+        packet.push(checksum & 0xFF)
+        
+        // 패킷 전송
+        let buf = Buffer.fromArray(packet)
+        serial.writeBuffer(buf)
+        
+        // 응답 대기
+        basic.pause(200)
+        
+        // 응답 수신
+        let response: number[] = []
+        let respBuf = serial.readBuffer(32)
+        
+        if (respBuf.length >= 12) {
+            // 헤더 확인
+            if (respBuf[0] == 0xEF && respBuf[1] == 0x01) {
+                let respLen = (respBuf[7] << 8) | respBuf[8]
+                // 데이터 추출 (상태 코드부터)
+                for (let i = 9; i < 9 + respLen - 2 && i < respBuf.length; i++) {
+                    response.push(respBuf[i])
+                }
+            }
+        }
+        
+        return response
     }
 
 

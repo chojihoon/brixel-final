@@ -4,7 +4,7 @@
  */
 
 //% weight=1070 color=#4D68EC icon="\uf0e7" block="04. Adv Sensors"
-//% groups="['실시간(RTC)', '대기압(BMP280)', '6축 가속도(MPU6050)', 'CO2센서(SGP30)', '거리센서(VL53L0X)', '온습도(I2C-SHT30)', '색상감지(TCS34725)', '제스처(APDS9960)', '심박(MAX30102)', '조도(BH1750)', '조도(TSL2561)', '3축 가속도(ADXL345)', '대기압(BME280)', 'Fingerprint', '전류/전압/전력 측정(INA219)', '전류 센서(ACS712)', '전압센서(Voltage Sensor)', 'Other']"
+//% groups="['실시간(RTC)', '대기압(BMP280)', '6축 가속도(MPU6050)', 'CO2센서(SGP30)', '거리센서(VL53L0X)', '온습도(I2C-SHT30)', '온습도(Si7021)', '비접촉온도(MLX90614)', '색상감지(TCS34725)', '제스처(APDS9960)', '심박(MAX30102)', '조도(BH1750)', '조도(TSL2561)', '3축 가속도(ADXL345)', '대기압(BME280)', 'Fingerprint', '전류/전압/전력 측정(INA219)', '전류 센서(ACS712)', '전압센서(Voltage Sensor)', 'Other']"
 namespace AdvSensors {
 
 
@@ -1923,6 +1923,206 @@ namespace AdvSensors {
     //% group="온습도(I2C-SHT30)" weight=142
     export function sht30ReadHumidity(): number {
         return _sht30Humidity
+    }
+
+
+    /********** Si7021 Temperature & Humidity Sensor **********/
+
+    // Si7021 Value Type
+    export enum Si7021Value {
+        //% block="Temperature(°C)"
+        TempC = 0,
+        //% block="Temperature(°F)"
+        TempF = 1,
+        //% block="Humidity(%)"
+        Humidity = 2
+    }
+
+    // Si7021 Serial Type
+    export enum Si7021Serial {
+        //% block="A"
+        A = 0,
+        //% block="B"
+        B = 1
+    }
+
+    // Si7021 Data Variables
+    let _si7021Addr: number = 0x40
+    let _si7021Temp: number = 0
+    let _si7021Humidity: number = 0
+
+    /**
+     * Si7021 Temperature & Humidity Sensor Setup
+     */
+    //% block="Si7021 Sensor Setup"
+    //% group="온습도(Si7021)" weight=141
+    export function si7021Init(): void {
+        _si7021Addr = 0x40
+        // Soft Reset
+        pins.i2cWriteNumber(_si7021Addr, 0xFE, NumberFormat.UInt8BE)
+        basic.pause(15)
+    }
+
+    /**
+     * Si7021 Read Value
+     * @param valueType Value type to read
+     */
+    //% block="Si7021 Read Value: $valueType"
+    //% valueType.defl=Si7021Value.TempC
+    //% group="온습도(Si7021)" weight=140
+    export function si7021Read(valueType: Si7021Value): number {
+        if (valueType == Si7021Value.Humidity) {
+            // Humidity measurement command (Hold Master Mode)
+            pins.i2cWriteNumber(_si7021Addr, 0xE5, NumberFormat.UInt8BE)
+            basic.pause(25)
+            
+            let buf = pins.i2cReadBuffer(_si7021Addr, 2)
+            let raw = (buf[0] << 8) | buf[1]
+            _si7021Humidity = ((125 * raw) / 65536) - 6
+            _si7021Humidity = Math.max(0, Math.min(100, _si7021Humidity))
+            return Math.round(_si7021Humidity * 100) / 100
+        } else {
+            // Temperature measurement command (Hold Master Mode)
+            pins.i2cWriteNumber(_si7021Addr, 0xE3, NumberFormat.UInt8BE)
+            basic.pause(25)
+            
+            let buf = pins.i2cReadBuffer(_si7021Addr, 2)
+            let raw = (buf[0] << 8) | buf[1]
+            _si7021Temp = ((175.72 * raw) / 65536) - 46.85
+            
+            if (valueType == Si7021Value.TempF) {
+                return Math.round((_si7021Temp * 9 / 5 + 32) * 100) / 100
+            }
+            return Math.round(_si7021Temp * 100) / 100
+        }
+    }
+
+    /**
+     * Si7021 Sensor Reset
+     */
+    //% block="Si7021 Sensor Reset"
+    //% group="온습도(Si7021)" weight=139
+    export function si7021Reset(): void {
+        pins.i2cWriteNumber(_si7021Addr, 0xFE, NumberFormat.UInt8BE)
+        basic.pause(15)
+    }
+
+    /**
+     * Si7021 Read Serial Number
+     * @param serialType Serial type (A or B)
+     */
+    //% block="Si7021 Read Serial: Serial $serialType"
+    //% serialType.defl=Si7021Serial.A
+    //% group="온습도(Si7021)" weight=138
+    export function si7021ReadSerial(serialType: Si7021Serial): number {
+        if (serialType == Si7021Serial.A) {
+            // Electronic ID 1st Byte (SNA)
+            pins.i2cWriteNumber(_si7021Addr, 0xFA0F, NumberFormat.UInt16BE)
+            basic.pause(10)
+            let buf = pins.i2cReadBuffer(_si7021Addr, 8)
+            return (buf[0] << 24) | (buf[2] << 16) | (buf[4] << 8) | buf[6]
+        } else {
+            // Electronic ID 2nd Byte (SNB)
+            pins.i2cWriteNumber(_si7021Addr, 0xFCC9, NumberFormat.UInt16BE)
+            basic.pause(10)
+            let buf = pins.i2cReadBuffer(_si7021Addr, 6)
+            return (buf[0] << 24) | (buf[1] << 16) | (buf[3] << 8) | buf[4]
+        }
+    }
+
+
+    /********** MLX90614 Infrared Temperature Sensor **********/
+
+    // MLX90614 Temperature Source
+    export enum MLX90614Source {
+        //% block="Object"
+        Object = 0,
+        //% block="Ambient"
+        Ambient = 1
+    }
+
+    // MLX90614 Temperature Unit
+    export enum MLX90614TempUnit {
+        //% block="Celsius (°C)"
+        Celsius = 0,
+        //% block="Fahrenheit (°F)"
+        Fahrenheit = 1,
+        //% block="Kelvin (K)"
+        Kelvin = 2
+    }
+
+    // MLX90614 Data Variables
+    let _mlx90614Addr: number = 0x5A
+    let _mlx90614ObjTemp: number = 0
+    let _mlx90614AmbTemp: number = 0
+
+    /**
+     * MLX90614 Temperature Sensor I2C Address Setup
+     * @param addr I2C address (default: 90 = 0x5A)
+     */
+    //% block="MLX90614 Sensor Setup I2C Address $addr"
+    //% addr.defl=90
+    //% group="비접촉온도(MLX90614)" weight=140
+    export function mlx90614Init(addr: number): void {
+        _mlx90614Addr = addr
+    }
+
+    /**
+     * MLX90614 Read Temperature
+     * @param source Temperature source (Object/Ambient)
+     * @param unit Temperature unit
+     */
+    //% block="$source Temperature Read as $unit"
+    //% source.defl=MLX90614Source.Object
+    //% unit.defl=MLX90614TempUnit.Celsius
+    //% group="비접촉온도(MLX90614)" weight=139
+    //% inlineInputMode=inline
+    export function mlx90614ReadTemp(source: MLX90614Source, unit: MLX90614TempUnit): number {
+        let cmd = source == MLX90614Source.Object ? 0x07 : 0x06
+        
+        // SMBus read: send register address
+        pins.i2cWriteNumber(_mlx90614Addr, cmd, NumberFormat.UInt8BE)
+        
+        // Read 3 bytes (2 bytes data + 1 byte PEC)
+        let buf = pins.i2cReadBuffer(_mlx90614Addr, 3)
+        
+        // Temperature calculation (raw value is in 0.02K units)
+        let raw = (buf[1] << 8) | buf[0]
+        let tempK = raw * 0.02  // Kelvin temperature
+        
+        // Store
+        if (source == MLX90614Source.Object) {
+            _mlx90614ObjTemp = tempK - 273.15
+        } else {
+            _mlx90614AmbTemp = tempK - 273.15
+        }
+        
+        // Unit conversion
+        if (unit == MLX90614TempUnit.Kelvin) {
+            return Math.round(tempK * 100) / 100
+        } else if (unit == MLX90614TempUnit.Fahrenheit) {
+            return Math.round(((tempK - 273.15) * 9 / 5 + 32) * 100) / 100
+        } else {
+            return Math.round((tempK - 273.15) * 100) / 100
+        }
+    }
+
+    /**
+     * MLX90614 Object Temperature (Celsius)
+     */
+    //% block="MLX90614 Object Temperature (°C)"
+    //% group="비접촉온도(MLX90614)" weight=138
+    export function mlx90614ObjectTemp(): number {
+        return mlx90614ReadTemp(MLX90614Source.Object, MLX90614TempUnit.Celsius)
+    }
+
+    /**
+     * MLX90614 Ambient Temperature (Celsius)
+     */
+    //% block="MLX90614 Ambient Temperature (°C)"
+    //% group="비접촉온도(MLX90614)" weight=137
+    export function mlx90614AmbientTemp(): number {
+        return mlx90614ReadTemp(MLX90614Source.Ambient, MLX90614TempUnit.Celsius)
     }
 
 

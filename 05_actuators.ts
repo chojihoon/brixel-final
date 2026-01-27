@@ -4,8 +4,79 @@
  */
 
 //% weight=1060 color=#50B91A icon="\uf013" block="05. Actuators"
-//% groups="['Servo Motors', 'Stepper Motors', 'DC모터(L298N)', 'DC모터(L293D)', '듀얼 H-브리지 모터(TB6612FNG)', '듀얼 H-브리지 DC 모터(DRV8833)', 'Relays', 'Solenoid', 'Fan모터', 'Pump모터']"
+//% groups="['Servo Motors', 'Servo Driver(PCA9685)', 'Stepper Motors', 'DC모터(L9110)', 'DC모터(L298N)', 'DC모터(L293D)', '듀얼 H-브리지 모터(TB6612FNG)', '듀얼 H-브리지 DC 모터(DRV8833)', 'Relays', 'Solenoid', 'Fan모터', 'Pump모터']"
 namespace Actuators05 {
+
+
+    /********** L9110 모터 드라이버 **********/
+
+    // L9110 방향
+    export enum L9110Direction {
+        //% block="Clockwise"
+        Clockwise = 0,
+        //% block="Counter Clockwise"
+        CounterClockwise = 1
+    }
+
+    // L9110 핀 저장 변수 (최대 4개 모터)
+    let _l9110PinA: AnalogPin[] = [AnalogPin.P0, AnalogPin.P0, AnalogPin.P0, AnalogPin.P0]
+    let _l9110PinB: AnalogPin[] = [AnalogPin.P1, AnalogPin.P1, AnalogPin.P1, AnalogPin.P1]
+
+    /**
+     * L9110 Motor Pin Setup
+     * @param motor Motor number (1-4)
+     * @param pinA Pin A
+     * @param pinB Pin B
+     */
+    //% block="DC Motor(L9110) $motor : Pin A $pinA , Pin B $pinB Setup"
+    //% motor.min=1 motor.max=4 motor.defl=1
+    //% pinA.defl=AnalogPin.P5
+    //% pinB.defl=AnalogPin.P6
+    //% group="DC모터(L9110)" weight=105
+    //% inlineInputMode=inline
+    export function l9110SetPins(motor: number, pinA: AnalogPin, pinB: AnalogPin): void {
+        let i = motor - 1
+        _l9110PinA[i] = pinA
+        _l9110PinB[i] = pinB
+    }
+
+    /**
+     * L9110 Motor Run
+     * @param motor Motor number (1-4)
+     * @param speed Speed (0-255)
+     * @param direction Direction
+     */
+    //% block="DC Motor $motor : Speed $speed , Direction $direction Rotate"
+    //% motor.min=1 motor.max=4 motor.defl=1
+    //% speed.min=0 speed.max=255 speed.defl=150
+    //% direction.defl=L9110Direction.Clockwise
+    //% group="DC모터(L9110)" weight=104
+    //% inlineInputMode=inline
+    export function l9110Run(motor: number, speed: number, direction: L9110Direction): void {
+        let i = motor - 1
+        let pwm = Math.map(speed, 0, 255, 0, 1023)
+        
+        if (direction == L9110Direction.Clockwise) {
+            pins.analogWritePin(_l9110PinA[i], pwm)
+            pins.analogWritePin(_l9110PinB[i], 0)
+        } else {
+            pins.analogWritePin(_l9110PinA[i], 0)
+            pins.analogWritePin(_l9110PinB[i], pwm)
+        }
+    }
+
+    /**
+     * L9110 Motor Stop
+     * @param motor Motor number (1-4)
+     */
+    //% block="DC Motor $motor : Stop"
+    //% motor.min=1 motor.max=4 motor.defl=1
+    //% group="DC모터(L9110)" weight=103
+    export function l9110Stop(motor: number): void {
+        let i = motor - 1
+        pins.analogWritePin(_l9110PinA[i], 0)
+        pins.analogWritePin(_l9110PinB[i], 0)
+    }
 
 
     /********** L298N 모터 드라이버 **********/
@@ -260,7 +331,7 @@ namespace Actuators05 {
 
     // 스테퍼 드라이버 타입
     export enum StepperDriver {
-        //% block="driver(2pin)"
+        //% block="Driver(2pin)"
         Driver2Pin = 0,
         //% block="ULN2003(4pin)"
         ULN2003 = 1
@@ -268,25 +339,25 @@ namespace Actuators05 {
 
     // 스테퍼 이동 타입
     export enum StepperMoveType {
-        //% block="move to absolute position"
+        //% block="Move to Absolute"
         Absolute = 0,
-        //% block="move to relative position"
+        //% block="Move to Relative"
         Relative = 1
     }
 
     // 스테퍼 동작
     export enum StepperAction {
-        //% block="run"
+        //% block="Run"
         Run = 0,
-        //% block="stop"
+        //% block="Stop"
         Stop = 1
     }
 
     // 스테퍼 상태
     export enum StepperStatus {
-        //% block="current position"
+        //% block="Current Position"
         Position = 0,
-        //% block="running"
+        //% block="Running"
         Running = 1
     }
 
@@ -301,8 +372,10 @@ namespace Actuators05 {
     let _stepperTarget: number[] = [0, 0, 0, 0]
     let _stepperRunning: boolean[] = [false, false, false, false]
 
-    //% block="step motor(A4988) driver( %index ) driver %driver : DIRpin %dirPin . Steppin %stepPin set"
+    //% block="Stepper Motor(A4988) Driver( $index ) $driver : DIR Pin $dirPin , Step Pin $stepPin Setup"
     //% index.min=1 index.max=4 index.defl=1
+    //% dirPin.defl=DigitalPin.P8
+    //% stepPin.defl=DigitalPin.P9
     //% group="Stepper Motors" weight=76
     //% inlineInputMode=inline
     export function stepperSetup(index: number, driver: StepperDriver, dirPin: DigitalPin, stepPin: DigitalPin): void {
@@ -311,7 +384,7 @@ namespace Actuators05 {
         _stepperStepPin[i] = stepPin
     }
 
-    //% block="step motor %index : max speed %maxSpeed . acceleration %accel . speed set %speed . step set %steps"
+    //% block="Stepper Motor $index : Max Speed $maxSpeed , Acceleration $accel , Speed Set $speed , Step Set $steps"
     //% index.min=1 index.max=4 index.defl=1
     //% maxSpeed.defl=1000 accel.defl=50 speed.defl=200 steps.defl=200
     //% group="Stepper Motors" weight=75
@@ -324,7 +397,7 @@ namespace Actuators05 {
         _stepperSteps[i] = steps
     }
 
-    //% block="step motor %index : %moveType %position"
+    //% block="Stepper Motor $index : $moveType $position"
     //% index.min=1 index.max=4 index.defl=1
     //% position.defl=200
     //% group="Stepper Motors" weight=74
@@ -338,7 +411,7 @@ namespace Actuators05 {
         }
     }
 
-    //% block="step motor %index : %action"
+    //% block="Stepper Motor $index : $action"
     //% index.min=1 index.max=4 index.defl=1
     //% group="Stepper Motors" weight=73
     export function stepperAction(index: number, action: StepperAction): void {
@@ -364,7 +437,7 @@ namespace Actuators05 {
         }
     }
 
-    //% block="step motor %index : %status"
+    //% block="Stepper Motor $index : $status"
     //% index.min=1 index.max=4 index.defl=1
     //% group="Stepper Motors" weight=72
     export function stepperGetStatus(index: number, status: StepperStatus): number {
@@ -373,6 +446,210 @@ namespace Actuators05 {
             return _stepperPosition[i]
         }
         return _stepperRunning[i] ? 1 : 0
+    }
+
+
+    /********** 28BYJ-48 Stepper Motor (4-pin ULN2003) **********/
+
+    // 28BYJ-48 Motor Type
+    export enum Stepper28BYJType {
+        //% block="28BYJ-48"
+        BYJ48 = 0,
+        //% block="ULN2003"
+        ULN2003 = 1,
+        //% block="Custom"
+        Custom = 2
+    }
+
+    // 28BYJ-48 Pin Mode
+    export enum Stepper28BYJPinMode {
+        //% block="4pin"
+        Pin4 = 0,
+        //% block="2pin"
+        Pin2 = 1
+    }
+
+    // 28BYJ-48 Move Unit
+    export enum Stepper28BYJUnit {
+        //% block="Step"
+        Step = 0,
+        //% block="Degree"
+        Degree = 1,
+        //% block="Revolution"
+        Revolution = 2
+    }
+
+    // 28BYJ-48 Data Variables (max 4 motors)
+    let _28byj_in1: DigitalPin[] = [DigitalPin.P8, DigitalPin.P8, DigitalPin.P8, DigitalPin.P8]
+    let _28byj_in2: DigitalPin[] = [DigitalPin.P9, DigitalPin.P9, DigitalPin.P9, DigitalPin.P9]
+    let _28byj_in3: DigitalPin[] = [DigitalPin.P10, DigitalPin.P10, DigitalPin.P10, DigitalPin.P10]
+    let _28byj_in4: DigitalPin[] = [DigitalPin.P11, DigitalPin.P11, DigitalPin.P11, DigitalPin.P11]
+    let _28byj_rpm: number[] = [10, 10, 10, 10]
+    let _28byj_position: number[] = [0, 0, 0, 0]
+    let _28byj_target: number[] = [0, 0, 0, 0]
+    let _28byj_stepsPerRev: number = 2048  // 28BYJ-48 steps per revolution
+
+    // Half-step sequence for 28BYJ-48
+    const _28byj_sequence: number[][] = [
+        [1, 0, 0, 0],
+        [1, 1, 0, 0],
+        [0, 1, 0, 0],
+        [0, 1, 1, 0],
+        [0, 0, 1, 0],
+        [0, 0, 1, 1],
+        [0, 0, 0, 1],
+        [1, 0, 0, 1]
+    ]
+
+    /**
+     * 28BYJ-48 Stepper Motor Setup (4-pin)
+     * @param motorType Motor type
+     * @param index Motor index (1-4)
+     * @param pinMode Pin mode
+     * @param in1 IN1 pin
+     * @param in2 IN2 pin
+     * @param in3 IN3 pin
+     * @param in4 IN4 pin
+     */
+    //% block="Stepper Motor( $motorType & $index ) $pinMode Connection Pin: IN1 $in1 IN2 $in2 IN3 $in3 IN4 $in4"
+    //% motorType.defl=Stepper28BYJType.BYJ48
+    //% index.min=1 index.max=4 index.defl=1
+    //% pinMode.defl=Stepper28BYJPinMode.Pin4
+    //% in1.defl=DigitalPin.P8
+    //% in2.defl=DigitalPin.P9
+    //% in3.defl=DigitalPin.P10
+    //% in4.defl=DigitalPin.P11
+    //% group="Stepper Motors" weight=69
+    //% inlineInputMode=inline
+    export function stepper28BYJSetup(motorType: Stepper28BYJType, index: number, pinMode: Stepper28BYJPinMode, in1: DigitalPin, in2: DigitalPin, in3: DigitalPin, in4: DigitalPin): void {
+        let i = index - 1
+        _28byj_in1[i] = in1
+        _28byj_in2[i] = in2
+        _28byj_in3[i] = in3
+        _28byj_in4[i] = in4
+    }
+
+    /**
+     * 28BYJ-48 Set RPM
+     * @param index Motor index
+     * @param rpm Speed in RPM
+     */
+    //% block="Stepper Motor $index : Rotation Speed $rpm RPM"
+    //% index.min=1 index.max=4 index.defl=1
+    //% rpm.min=1 rpm.max=15 rpm.defl=10
+    //% group="Stepper Motors" weight=68
+    export function stepper28BYJSetRPM(index: number, rpm: number): void {
+        let i = index - 1
+        _28byj_rpm[i] = rpm
+    }
+
+    /**
+     * 28BYJ-48 Set Move Target
+     * @param index Motor index
+     * @param unit Move unit
+     * @param value Move value
+     */
+    //% block="Stepper Motor $index : $unit by $value Move Set"
+    //% index.min=1 index.max=4 index.defl=1
+    //% unit.defl=Stepper28BYJUnit.Step
+    //% value.defl=35
+    //% group="Stepper Motors" weight=67
+    //% inlineInputMode=inline
+    export function stepper28BYJSetMove(index: number, unit: Stepper28BYJUnit, value: number): void {
+        let i = index - 1
+        let steps = value
+        
+        if (unit == Stepper28BYJUnit.Degree) {
+            steps = Math.round(value * _28byj_stepsPerRev / 360)
+        } else if (unit == Stepper28BYJUnit.Revolution) {
+            steps = Math.round(value * _28byj_stepsPerRev)
+        }
+        
+        _28byj_target[i] = _28byj_position[i] + steps
+    }
+
+    /**
+     * 28BYJ-48 Move Motor
+     * @param index Motor index
+     */
+    //% block="Stepper Motor $index : Move"
+    //% index.min=1 index.max=4 index.defl=1
+    //% group="Stepper Motors" weight=66
+    export function stepper28BYJMove(index: number): void {
+        let i = index - 1
+        let stepsToMove = _28byj_target[i] - _28byj_position[i]
+        let direction = stepsToMove > 0 ? 1 : -1
+        stepsToMove = Math.abs(stepsToMove)
+        
+        // Calculate delay based on RPM
+        // 28BYJ-48: 2048 steps/rev, delay = 60000000 / (rpm * 2048 * 8) microseconds
+        let delayUs = Math.floor(60000000 / (_28byj_rpm[i] * _28byj_stepsPerRev))
+        
+        let seqIndex = 0
+        for (let s = 0; s < stepsToMove; s++) {
+            // Set pins according to sequence
+            pins.digitalWritePin(_28byj_in1[i], _28byj_sequence[seqIndex][0])
+            pins.digitalWritePin(_28byj_in2[i], _28byj_sequence[seqIndex][1])
+            pins.digitalWritePin(_28byj_in3[i], _28byj_sequence[seqIndex][2])
+            pins.digitalWritePin(_28byj_in4[i], _28byj_sequence[seqIndex][3])
+            
+            // Next sequence step
+            if (direction > 0) {
+                seqIndex = (seqIndex + 1) % 8
+            } else {
+                seqIndex = (seqIndex + 7) % 8
+            }
+            
+            _28byj_position[i] += direction
+            
+            control.waitMicros(delayUs)
+        }
+        
+        // Turn off all coils
+        pins.digitalWritePin(_28byj_in1[i], 0)
+        pins.digitalWritePin(_28byj_in2[i], 0)
+        pins.digitalWritePin(_28byj_in3[i], 0)
+        pins.digitalWritePin(_28byj_in4[i], 0)
+    }
+
+    /**
+     * 28BYJ-48 Stop Motor
+     * @param index Motor index
+     */
+    //% block="Stepper Motor $index : Stop"
+    //% index.min=1 index.max=4 index.defl=1
+    //% group="Stepper Motors" weight=65
+    export function stepper28BYJStop(index: number): void {
+        let i = index - 1
+        pins.digitalWritePin(_28byj_in1[i], 0)
+        pins.digitalWritePin(_28byj_in2[i], 0)
+        pins.digitalWritePin(_28byj_in3[i], 0)
+        pins.digitalWritePin(_28byj_in4[i], 0)
+        _28byj_target[i] = _28byj_position[i]
+    }
+
+    /**
+     * 28BYJ-48 Get Position
+     * @param index Motor index
+     */
+    //% block="Stepper Motor $index : Position"
+    //% index.min=1 index.max=4 index.defl=1
+    //% group="Stepper Motors" weight=64
+    export function stepper28BYJGetPosition(index: number): number {
+        return _28byj_position[index - 1]
+    }
+
+    /**
+     * 28BYJ-48 Reset Position
+     * @param index Motor index
+     */
+    //% block="Stepper Motor $index : Reset Position"
+    //% index.min=1 index.max=4 index.defl=1
+    //% group="Stepper Motors" weight=63
+    export function stepper28BYJResetPosition(index: number): void {
+        let i = index - 1
+        _28byj_position[i] = 0
+        _28byj_target[i] = 0
     }
 
     /********** MG996R 서보 모터 **********/
@@ -431,7 +708,334 @@ namespace Actuators05 {
         pins.servoSetPulse(pin, pulse)
     }
 
-    // 28BYJ-48, NEMA17은 위의 통합 스테퍼 시스템 사용
+    /**
+     * Servo Read Angle (for analog feedback servo)
+     * @param pin Feedback pin
+     */
+    //% block="Servo Pin $pin Read Angle"
+    //% pin.defl=AnalogPin.P0
+    //% group="Servo Motors" weight=76
+    export function servoReadAngle(pin: AnalogPin): number {
+        // Read analog value (0-1023)
+        let raw = pins.analogReadPin(pin)
+        // Convert 0-1023 to 0-180 degrees
+        return Math.round(Math.map(raw, 0, 1023, 0, 180))
+    }
+
+    /**
+     * Servo Read Microseconds (for analog feedback servo)
+     * @param pin Feedback pin
+     */
+    //% block="Servo Pin $pin Read Micros"
+    //% pin.defl=AnalogPin.P0
+    //% group="Servo Motors" weight=75
+    export function servoReadMicros(pin: AnalogPin): number {
+        // Read analog value (0-1023)
+        let raw = pins.analogReadPin(pin)
+        // Convert 0-1023 to 500-2500μs
+        return Math.round(Math.map(raw, 0, 1023, 500, 2500))
+    }
+
+    /**
+     * Servo Is Connected
+     * @param pin Feedback pin
+     */
+    //% block="Servo Pin $pin Connected?"
+    //% pin.defl=AnalogPin.P0
+    //% group="Servo Motors" weight=74
+    export function servoIsConnected(pin: AnalogPin): boolean {
+        // Read analog value
+        let raw = pins.analogReadPin(pin)
+        // If within valid range, considered connected
+        return raw > 10 && raw < 1013
+    }
+
+
+    /********** Geekservo **********/
+
+    // Geekservo Direction
+    export enum GeekservoDirection {
+        //% block="Forward (CW)"
+        Forward = 0,
+        //% block="Backward (CCW)"
+        Backward = 1
+    }
+
+    /**
+     * 360 Geekservo Set Angle
+     * @param pin Servo pin
+     * @param angle Angle (0-360)
+     */
+    //% block="360 Geekservo Pin $pin Set Angle $angle (0~360)"
+    //% pin.defl=AnalogPin.P0
+    //% angle.min=0 angle.max=360 angle.defl=0
+    //% group="Servo Motors" weight=73
+    //% inlineInputMode=inline
+    export function geekservo360SetAngle(pin: AnalogPin, angle: number): void {
+        // Convert 0-360 degrees to 500-2500μs
+        let pulse = Math.map(angle, 0, 360, 500, 2500)
+        pins.servoSetPulse(pin, pulse)
+    }
+
+    /**
+     * Geekservo Wheel Mode (continuous rotation)
+     * @param pin Servo pin
+     * @param speed Speed (0-100)
+     * @param direction Direction
+     */
+    //% block="Geekservo Wheel Pin $pin Speed $speed Direction $direction"
+    //% pin.defl=AnalogPin.P0
+    //% speed.min=0 speed.max=100 speed.defl=100
+    //% direction.defl=GeekservoDirection.Forward
+    //% group="Servo Motors" weight=72
+    //% inlineInputMode=inline
+    export function geekservoWheel(pin: AnalogPin, speed: number, direction: GeekservoDirection): void {
+        // Geekservo continuous rotation: 1500μs = stop, 500μs = max CCW, 2500μs = max CW
+        let pulse = 1500
+        if (speed > 0) {
+            if (direction == GeekservoDirection.Forward) {
+                // Clockwise: 1500 -> 2500
+                pulse = Math.map(speed, 0, 100, 1500, 2500)
+            } else {
+                // Counter-clockwise: 1500 -> 500
+                pulse = Math.map(speed, 0, 100, 1500, 500)
+            }
+        }
+        pins.servoSetPulse(pin, pulse)
+    }
+
+    /**
+     * Geekservo Stop
+     * @param pin Servo pin
+     */
+    //% block="Geekservo Pin $pin Stop"
+    //% pin.defl=AnalogPin.P0
+    //% group="Servo Motors" weight=71
+    export function geekservoStop(pin: AnalogPin): void {
+        pins.servoSetPulse(pin, 1500)
+    }
+
+
+    /********** PCA9685 Servo Driver **********/
+
+    // PCA9685 I2C Address
+    export enum PCA9685Address {
+        //% block="0x40"
+        Addr0x40 = 0x40,
+        //% block="0x41"
+        Addr0x41 = 0x41,
+        //% block="0x42"
+        Addr0x42 = 0x42,
+        //% block="0x43"
+        Addr0x43 = 0x43,
+        //% block="0x44"
+        Addr0x44 = 0x44,
+        //% block="0x45"
+        Addr0x45 = 0x45,
+        //% block="0x46"
+        Addr0x46 = 0x46,
+        //% block="0x47"
+        Addr0x47 = 0x47
+    }
+
+    // PCA9685 Sleep Mode
+    export enum PCA9685SleepMode {
+        //% block="Wake"
+        Wake = 0,
+        //% block="Sleep"
+        Sleep = 1
+    }
+
+    // PCA9685 Data Variables (max 8 drivers)
+    let _pca9685Addr: number[] = [0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47]
+    let _pca9685Freq: number[] = [50, 50, 50, 50, 50, 50, 50, 50]
+    let _pca9685Initialized: boolean[] = [false, false, false, false, false, false, false, false]
+
+    /**
+     * PCA9685 write register
+     */
+    function pca9685WriteReg(index: number, reg: number, value: number): void {
+        let buf = pins.createBuffer(2)
+        buf[0] = reg
+        buf[1] = value
+        pins.i2cWriteBuffer(_pca9685Addr[index - 1], buf)
+    }
+
+    /**
+     * PCA9685 Servo Driver Setup
+     * @param index Driver index (1-8)
+     * @param addr I2C address
+     * @param freq PWM frequency in Hz
+     */
+    //% block="Servo Driver(PCA9685) Setup $index I2C Address $addr PWM Frequency $freq Hz"
+    //% index.min=1 index.max=8 index.defl=1
+    //% addr.defl=PCA9685Address.Addr0x40
+    //% freq.min=24 freq.max=1526 freq.defl=50
+    //% group="Servo Driver(PCA9685)" weight=60
+    //% inlineInputMode=inline
+    export function pca9685Setup(index: number, addr: PCA9685Address, freq: number): void {
+        let i = index - 1
+        _pca9685Addr[i] = addr
+        _pca9685Freq[i] = freq
+
+        // Reset PCA9685
+        pca9685WriteReg(index, 0x00, 0x00)
+        basic.pause(5)
+
+        // Set sleep mode to configure frequency
+        pca9685WriteReg(index, 0x00, 0x10)
+        basic.pause(5)
+
+        // Calculate prescale value: prescale = round(25MHz / (4096 * freq)) - 1
+        let prescale = Math.round(25000000 / (4096 * freq)) - 1
+        pca9685WriteReg(index, 0xFE, prescale)
+
+        // Wake up
+        pca9685WriteReg(index, 0x00, 0x00)
+        basic.pause(5)
+
+        // Auto-increment enabled
+        pca9685WriteReg(index, 0x00, 0xA0)
+
+        _pca9685Initialized[i] = true
+    }
+
+    /**
+     * PCA9685 Set Servo Angle
+     * @param index Driver index
+     * @param channel Channel (0-15)
+     * @param angle Angle in degrees
+     */
+    //% block="Servo Driver $index Channel $channel Angle Set $angle degree"
+    //% index.min=1 index.max=8 index.defl=1
+    //% channel.min=0 channel.max=15 channel.defl=0
+    //% angle.min=0 angle.max=180 angle.defl=90
+    //% group="Servo Driver(PCA9685)" weight=59
+    //% inlineInputMode=inline
+    export function pca9685SetAngle(index: number, channel: number, angle: number): void {
+        // Convert angle to pulse width (500-2500μs for 0-180°)
+        let pulseWidth = Math.map(angle, 0, 180, 500, 2500)
+        // Convert to PWM value (at 50Hz, 1 cycle = 20000μs, 4096 steps)
+        let pwmValue = Math.round(pulseWidth * 4096 / (1000000 / _pca9685Freq[index - 1]))
+        pca9685SetPWM(index, channel, 0, pwmValue)
+    }
+
+    /**
+     * PCA9685 Set Servo Pulse
+     * @param index Driver index
+     * @param channel Channel (0-15)
+     * @param pulse Pulse width in microseconds
+     */
+    //% block="Servo Driver $index Channel $channel Pulse Set $pulse Microseconds"
+    //% index.min=1 index.max=8 index.defl=1
+    //% channel.min=0 channel.max=15 channel.defl=0
+    //% pulse.defl=1500
+    //% group="Servo Driver(PCA9685)" weight=58
+    //% inlineInputMode=inline
+    export function pca9685SetPulse(index: number, channel: number, pulse: number): void {
+        // Convert to PWM value
+        let pwmValue = Math.round(pulse * 4096 / (1000000 / _pca9685Freq[index - 1]))
+        pca9685SetPWM(index, channel, 0, pwmValue)
+    }
+
+    /**
+     * PCA9685 Set PWM Value
+     * @param index Driver index
+     * @param channel Channel (0-15)
+     * @param value PWM value (0-4095)
+     */
+    //% block="Servo Driver $index Channel $channel PWM Value $value (0-4095)"
+    //% index.min=1 index.max=8 index.defl=1
+    //% channel.min=0 channel.max=15 channel.defl=0
+    //% value.min=0 value.max=4095 value.defl=2048
+    //% group="Servo Driver(PCA9685)" weight=57
+    //% inlineInputMode=inline
+    export function pca9685SetPWMValue(index: number, channel: number, value: number): void {
+        pca9685SetPWM(index, channel, 0, value)
+    }
+
+    /**
+     * PCA9685 Set PWM On/Off
+     * @param index Driver index
+     * @param channel Channel (0-15)
+     * @param on On time (0-4095)
+     * @param off Off time (0-4095)
+     */
+    //% block="Servo Driver $index Channel $channel PWM On $on Off $off"
+    //% index.min=1 index.max=8 index.defl=1
+    //% channel.min=0 channel.max=15 channel.defl=0
+    //% on.min=0 on.max=4095 on.defl=0
+    //% off.min=0 off.max=4095 off.defl=2048
+    //% group="Servo Driver(PCA9685)" weight=56
+    //% inlineInputMode=inline
+    export function pca9685SetPWM(index: number, channel: number, on: number, off: number): void {
+        let i = index - 1
+        let reg = 0x06 + channel * 4
+        let buf = pins.createBuffer(5)
+        buf[0] = reg
+        buf[1] = on & 0xFF
+        buf[2] = (on >> 8) & 0xFF
+        buf[3] = off & 0xFF
+        buf[4] = (off >> 8) & 0xFF
+        pins.i2cWriteBuffer(_pca9685Addr[i], buf)
+    }
+
+    /**
+     * PCA9685 Sleep/Wake
+     * @param index Driver index
+     * @param mode Sleep mode
+     */
+    //% block="Servo Driver $index $mode"
+    //% index.min=1 index.max=8 index.defl=1
+    //% mode.defl=PCA9685SleepMode.Wake
+    //% group="Servo Driver(PCA9685)" weight=55
+    export function pca9685Sleep(index: number, mode: PCA9685SleepMode): void {
+        if (mode == PCA9685SleepMode.Sleep) {
+            pca9685WriteReg(index, 0x00, 0x10)
+        } else {
+            pca9685WriteReg(index, 0x00, 0xA0)
+        }
+    }
+
+    /**
+     * PCA9685 Set Multiple Servos
+     * @param index Driver index
+     * @param ch1 Channel 1 angle
+     * @param ch2 Channel 2 angle
+     * @param ch3 Channel 3 angle
+     * @param ch4 Channel 4 angle
+     */
+    //% block="Servo Driver $index Multi Servo Set Ch1 $ch1 ° Ch2 $ch2 ° Ch3 $ch3 ° Ch4 $ch4 °"
+    //% index.min=1 index.max=8 index.defl=1
+    //% ch1.min=0 ch1.max=180 ch1.defl=90
+    //% ch2.min=0 ch2.max=180 ch2.defl=90
+    //% ch3.min=0 ch3.max=180 ch3.defl=90
+    //% ch4.min=0 ch4.max=180 ch4.defl=90
+    //% group="Servo Driver(PCA9685)" weight=54
+    //% inlineInputMode=inline
+    export function pca9685SetMultiServo(index: number, ch1: number, ch2: number, ch3: number, ch4: number): void {
+        pca9685SetAngle(index, 0, ch1)
+        pca9685SetAngle(index, 1, ch2)
+        pca9685SetAngle(index, 2, ch3)
+        pca9685SetAngle(index, 3, ch4)
+    }
+
+    /**
+     * PCA9685 Set LED Brightness
+     * @param index Driver index
+     * @param channel Channel (0-15)
+     * @param brightness Brightness (0-100%)
+     */
+    //% block="Servo Driver $index Channel $channel LED Brightness $brightness \\%"
+    //% index.min=1 index.max=8 index.defl=1
+    //% channel.min=0 channel.max=15 channel.defl=0
+    //% brightness.min=0 brightness.max=100 brightness.defl=50
+    //% group="Servo Driver(PCA9685)" weight=53
+    //% inlineInputMode=inline
+    export function pca9685SetLED(index: number, channel: number, brightness: number): void {
+        let pwmValue = Math.round(brightness * 4095 / 100)
+        pca9685SetPWM(index, channel, 0, pwmValue)
+    }
 
 
     /********** 1채널 릴레이 **********/
