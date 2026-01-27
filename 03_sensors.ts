@@ -1428,7 +1428,7 @@ namespace Sensors03 {
     // 지문 센서 상태 변수
     let _fpSerialType: FingerprintSerial = FingerprintSerial.Software
     let _fpRxPin: SerialPin = SerialPin.P2
-    let _fpTxPin: SerialPin = SerialPin.P3
+    let _fpTxPin: SerialPin = SerialPin.P8
     let _fpBaudRate: BaudRate = BaudRate.BaudRate57600
     let _fpFingerID: number = -1
     let _fpConfidence: number = 0
@@ -1453,7 +1453,7 @@ namespace Sensors03 {
     //% block="지문 센서 설정: 시리얼 $serialType , RX핀 $rx , TX핀 $tx , 통신 속도 $baudRate"
     //% serialType.defl=FingerprintSerial.Software
     //% rx.defl=SerialPin.P2
-    //% tx.defl=SerialPin.P3
+    //% tx.defl=SerialPin.P8
     //% baudRate.defl=57600
     //% group="지문센서" weight=185
     //% inlineInputMode=inline
