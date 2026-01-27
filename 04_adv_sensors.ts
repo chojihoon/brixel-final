@@ -4,7 +4,7 @@
  */
 
 //% weight=1070 color=#4D68EC icon="\uf0e7" block="04. Adv Sensors"
-//% groups="['실시간(RTC)', '대기압(BMP280)', '6축 가속도(MPU6050)', 'CO2센서(SGP30)', '거리센서(VL53L0X)', '온습도(I2C-SHT30)', '온습도(Si7021)', '비접촉온도(MLX90614)', '색상감지(TCS34725)', '제스처(APDS9960)', '심박(MAX30102)', '조도(BH1750)', '조도(TSL2561)', '3축 가속도(ADXL345)', '대기압(BME280)', 'Fingerprint', '전류/전압/전력 측정(INA219)', '전류 센서(ACS712)', '전압센서(Voltage Sensor)', 'Other']"
+//% groups="['실시간(RTC)', '대기압(BMP280)', '6축 가속도(MPU6050)', 'CO2센서(SGP30)', '거리센서(VL53L0X)', '온습도(I2C-SHT30)', '색상감지(TCS34725)', '비접촉온도(MLX90614)', '제스처(APDS9960)', '심박(MAX30102)', '온습도(Si7021)', '조도(BH1750)', '조도(TSL2561)', '3축 가속도(ADXL345)', '대기압(BME280)', 'Fingerprint', '전류/전압/전력 측정(INA219)', '전류 센서(ACS712)', '전압센서(Voltage Sensor)', 'Other']"
 namespace AdvSensors {
 
 

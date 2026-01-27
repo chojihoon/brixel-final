@@ -4,7 +4,7 @@
  */
 
 //% weight=1100 color=#FAC907 icon="\uf108" block="01. Displays"
-//% groups="['LCD', '네오픽셀(NeoPixel)', '숫자표시장치(TM1637)']"
+//% groups="['LCD', '숫자표시장치(TM1637)', '네오픽셀(NeoPixel)']"
 namespace Displays01 {
 
 

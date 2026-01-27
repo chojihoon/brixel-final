@@ -4,7 +4,7 @@
  */
 
 //% weight=1080 color=#FF6F00 icon="\uf0e7" block="03. Sensors"
-//% groups="['초음파(HC-SR04)', '온습도(DHT11/DHT22)', '물온도(DS18B20)', '무게(HX711)', 'I2C 무게센서', '서미스터(NTC)', '지문센서', 'Rotary Encoder', '미세먼지(PMS)', 'CO2센서(MHZ19)', '전기전도도(TDS)', 'pH', '탁도(Turbidity)', 'UV Sensor', '온도(LM35)', '미세먼지(GP2Y0A21YK)', '초음파(US-100)', '빛(TEMT6000)', '가스(MQ-2)', '가스(MQ-135)', 'CO2센서(CCS811)', 'Joystick', 'Keypad', 'Button', 'Potentiometer', 'Other Sensors']"
+//% groups="['초음파(HC-SR04)', '온습도(DHT11/DHT22)', '물온도(DS18B20)', '무게(HX711)', 'I2C 무게센서', 'Rotary Encoder', '서미스터(NTC)', '미세먼지(PMS)', 'CO2센서(MHZ19)', '전기전도도(TDS)', 'pH', '지문센서', '탁도(Turbidity)', 'UV Sensor', '온도(LM35)', '미세먼지(GP2Y0A21YK)', '초음파(US-100)', '빛(TEMT6000)', '가스(MQ-2)', '가스(MQ-135)', 'CO2센서(CCS811)', 'Joystick', 'Keypad', 'Button', 'Potentiometer', 'Other Sensors']"
 namespace Sensors03 {
 
 

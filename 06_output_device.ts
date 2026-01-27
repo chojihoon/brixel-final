@@ -4,7 +4,7 @@
  */
 
 //% weight=1050 color=#50B91A icon="\uf028" block="06. Output Device"
-//% groups="['Buzzer', 'MP3 Player (KT403A)', 'MP3 Player (DFPlayer)', 'SD Card', 'EEPROM', 'Microphone']"
+//% groups="['Buzzer', 'MP3 Player (KT403A)', 'SD Card', 'MP3 Player (DFPlayer)', 'EEPROM', 'Microphone']"
 namespace OutputDevice {
 
 

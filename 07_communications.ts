@@ -4,7 +4,7 @@
  */
 
 //% weight=1040 color=#F75ACF icon="\uf1eb" block="07. Communications"
-//% groups="['RF433MHz', 'Infrared', 'MFRC522', 'PN532', 'GPS', 'nRF24L01', 'LoRa']"
+//% groups="['Infrared', 'RF433MHz', 'GPS', 'MFRC522', 'PN532', 'nRF24L01', 'LoRa']"
 namespace Communications07 {
 
 

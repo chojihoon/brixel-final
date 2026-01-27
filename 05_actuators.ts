@@ -4,7 +4,7 @@
  */
 
 //% weight=1060 color=#50B91A icon="\uf013" block="05. Actuators"
-//% groups="['Servo Motors', 'Servo Driver(PCA9685)', 'Stepper Motors', 'DC모터(L9110)', 'DC모터(L298N)', 'DC모터(L293D)', '듀얼 H-브리지 모터(TB6612FNG)', '듀얼 H-브리지 DC 모터(DRV8833)', 'Relays', 'Solenoid', 'Fan모터', 'Pump모터']"
+//% groups="['Servo Motors', 'DC모터(L9110)', 'Stepper Motors', 'Servo Driver(PCA9685)', 'DC모터(L298N)', 'DC모터(L293D)', '듀얼 H-브리지 모터(TB6612FNG)', '듀얼 H-브리지 DC 모터(DRV8833)', 'Relays', 'Solenoid', 'Fan모터', 'Pump모터']"
 namespace Actuators05 {
 
 
