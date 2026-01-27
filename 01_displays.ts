@@ -126,6 +126,298 @@ namespace Displays01 {
     }
 
 
+    /********** TM1637 7세그먼트 디스플레이 **********/
+
+    // TM1637 소수점 옵션
+    export enum TM1637Decimal {
+        //% block="decimal none"
+        None = 0,
+        //% block="decimal 1digit"
+        Dec1 = 1,
+        //% block="decimal 2digit"
+        Dec2 = 2,
+        //% block="decimal 3digit"
+        Dec3 = 3
+    }
+
+    // TM1637 음수 기호 옵션
+    export enum TM1637Negative {
+        //% block="show negative sign"
+        Show = 1,
+        //% block="hide negative sign"
+        Hide = 0
+    }
+
+    // TM1637 콜론 옵션
+    export enum TM1637Colon {
+        //% block="colon"
+        Colon = 1,
+        //% block="none"
+        None = 0
+    }
+
+    // TM1637 위치
+    export enum TM1637Position {
+        //% block="1st (left)"
+        Pos1 = 0,
+        //% block="2nd"
+        Pos2 = 1,
+        //% block="3rd"
+        Pos3 = 2,
+        //% block="4th (right)"
+        Pos4 = 3
+    }
+
+    // TM1637 핀 저장 변수
+    let _tm1637Clk: DigitalPin = DigitalPin.P2
+    let _tm1637Dio: DigitalPin = DigitalPin.P3
+    let _tm1637Brightness: number = 7
+    let _tm1637Colon: boolean = false
+    let _tm1637Buffer: number[] = [0, 0, 0, 0]
+
+    // 7세그먼트 폰트 (0-9, A-Z, 일부 특수문자)
+    const TM1637_FONT: number[] = [
+        0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F,  // 0-9
+        0x77, 0x7C, 0x39, 0x5E, 0x79, 0x71,  // A-F
+        0x3D, 0x76, 0x06, 0x1E, 0x76, 0x38, 0x15, 0x54, 0x3F,  // G-O
+        0x73, 0x67, 0x50, 0x6D, 0x78, 0x3E, 0x1C, 0x2A, 0x76, 0x6E, 0x5B,  // P-Z
+        0x00, 0x40  // 공백, 마이너스
+    ]
+
+    //% block="FND(TM1637) CLK pin %clk|DATA pin %dio set"
+    //% clk.defl=DigitalPin.P2 dio.defl=DigitalPin.P3
+    //% group="숫자표시장치(TM1637)" weight=100
+    //% inlineInputMode=inline
+    export function tm1637Init(clk: DigitalPin, dio: DigitalPin): void {
+        _tm1637Clk = clk
+        _tm1637Dio = dio
+        _tm1637Brightness = 7
+        _tm1637Colon = false
+        _tm1637Buffer = [0, 0, 0, 0]
+
+        // 초기화
+        tm1637Start()
+        tm1637WriteByte(0x40)  // 데이터 명령: 자동 주소 증가
+        tm1637Stop()
+
+        tm1637Clear()
+        tm1637SetBrightness(7)
+    }
+
+    //% block="FNDnumber show %num|%decimal|%negative"
+    //% num.defl=1234
+    //% group="숫자표시장치(TM1637)" weight=99
+    //% inlineInputMode=inline
+    export function tm1637ShowNumber(num: number, decimal: TM1637Decimal, negative: TM1637Negative): void {
+        let isNegative = num < 0
+        num = Math.abs(num)
+
+        // 소수점 처리
+        if (decimal != TM1637Decimal.None) {
+            num = Math.round(num * Math.pow(10, decimal))
+        }
+
+        let digits: number[] = [0, 0, 0, 0]
+        let startPos = 0
+
+        // 숫자 분리
+        for (let i = 3; i >= 0; i--) {
+            digits[i] = num % 10
+            num = Math.floor(num / 10)
+        }
+
+        // 음수 기호 처리
+        if (isNegative && negative == TM1637Negative.Show) {
+            // 앞쪽 0을 마이너스로 대체
+            for (let i = 0; i < 3; i++) {
+                if (digits[i] == 0) {
+                    _tm1637Buffer[i] = 0x40  // 마이너스
+                    startPos = i + 1
+                    break
+                }
+            }
+        }
+
+        // 버퍼에 숫자 저장
+        for (let i = startPos; i < 4; i++) {
+            _tm1637Buffer[i] = TM1637_FONT[digits[i]]
+            // 소수점 추가
+            if (decimal != TM1637Decimal.None && i == (3 - decimal)) {
+                _tm1637Buffer[i] |= 0x80
+            }
+        }
+
+        // 콜론 추가 (2번째 자리)
+        if (_tm1637Colon) {
+            _tm1637Buffer[1] |= 0x80
+        }
+
+        tm1637Display()
+    }
+
+    //% block="FNDtime show %hour|: %minute|%colon show"
+    //% hour.min=0 hour.max=23 hour.defl=12
+    //% minute.min=0 minute.max=59 minute.defl=30
+    //% group="숫자표시장치(TM1637)" weight=98
+    //% inlineInputMode=inline
+    export function tm1637ShowTime(hour: number, minute: number, colon: TM1637Colon): void {
+        _tm1637Buffer[0] = TM1637_FONT[Math.floor(hour / 10)]
+        _tm1637Buffer[1] = TM1637_FONT[hour % 10]
+        _tm1637Buffer[2] = TM1637_FONT[Math.floor(minute / 10)]
+        _tm1637Buffer[3] = TM1637_FONT[minute % 10]
+
+        // 콜론 표시
+        if (colon == TM1637Colon.Colon) {
+            _tm1637Buffer[1] |= 0x80
+        }
+
+        tm1637Display()
+    }
+
+    //% block="FND text show %text |scroll delay %delay ms"
+    //% text.defl="Hello"
+    //% delay.defl=500 delay.min=100 delay.max=2000
+    //% group="숫자표시장치(TM1637)" weight=97
+    //% inlineInputMode=inline
+    export function tm1637ShowText(text: string, delay: number): void {
+        text = text.toUpperCase()
+        let len = text.length
+
+        if (len <= 4) {
+            // 4자 이하면 바로 표시
+            for (let i = 0; i < 4; i++) {
+                if (i < len) {
+                    _tm1637Buffer[i] = tm1637CharToSegment(text.charCodeAt(i))
+                } else {
+                    _tm1637Buffer[i] = 0
+                }
+            }
+            tm1637Display()
+        } else {
+            // 4자 초과면 스크롤
+            let padded = "    " + text + "    "
+            for (let pos = 0; pos < padded.length - 3; pos++) {
+                for (let i = 0; i < 4; i++) {
+                    _tm1637Buffer[i] = tm1637CharToSegment(padded.charCodeAt(pos + i))
+                }
+                tm1637Display()
+                basic.pause(delay)
+            }
+        }
+    }
+
+    //% block="FND position %pos|at number %digit show"
+    //% digit.min=0 digit.max=9 digit.defl=8
+    //% group="숫자표시장치(TM1637)" weight=96
+    //% inlineInputMode=inline
+    export function tm1637ShowDigitAt(pos: TM1637Position, digit: number): void {
+        _tm1637Buffer[pos] = TM1637_FONT[digit % 10]
+        tm1637Display()
+    }
+
+    //% block="FNDscreen clear"
+    //% group="숫자표시장치(TM1637)" weight=95
+    export function tm1637Clear(): void {
+        _tm1637Buffer = [0, 0, 0, 0]
+        tm1637Display()
+    }
+
+    //% block="FNDbrightness set %brightness"
+    //% brightness.min=0 brightness.max=7 brightness.defl=7
+    //% group="숫자표시장치(TM1637)" weight=94
+    export function tm1637SetBrightness(brightness: number): void {
+        _tm1637Brightness = Math.clamp(0, 7, brightness)
+
+        tm1637Start()
+        if (_tm1637Brightness == 0) {
+            tm1637WriteByte(0x80)  // 디스플레이 OFF
+        } else {
+            tm1637WriteByte(0x88 | _tm1637Brightness)  // 디스플레이 ON + 밝기
+        }
+        tm1637Stop()
+    }
+
+    //% block="FNDcolon %colon show"
+    //% group="숫자표시장치(TM1637)" weight=93
+    export function tm1637SetColon(colon: TM1637Colon): void {
+        _tm1637Colon = (colon == TM1637Colon.Colon)
+        if (_tm1637Colon) {
+            _tm1637Buffer[1] |= 0x80
+        } else {
+            _tm1637Buffer[1] &= 0x7F
+        }
+        tm1637Display()
+    }
+
+    // 문자를 7세그먼트 코드로 변환
+    function tm1637CharToSegment(charCode: number): number {
+        if (charCode >= 48 && charCode <= 57) {
+            // 0-9
+            return TM1637_FONT[charCode - 48]
+        } else if (charCode >= 65 && charCode <= 90) {
+            // A-Z
+            return TM1637_FONT[charCode - 65 + 10]
+        } else if (charCode == 32) {
+            // 공백
+            return 0x00
+        } else if (charCode == 45) {
+            // 마이너스
+            return 0x40
+        }
+        return 0x00
+    }
+
+    // TM1637 디스플레이 갱신
+    function tm1637Display(): void {
+        tm1637Start()
+        tm1637WriteByte(0xC0)  // 주소 명령: 첫 번째 주소
+        for (let i = 0; i < 4; i++) {
+            tm1637WriteByte(_tm1637Buffer[i])
+        }
+        tm1637Stop()
+
+        tm1637Start()
+        tm1637WriteByte(0x88 | _tm1637Brightness)
+        tm1637Stop()
+    }
+
+    // TM1637 통신 함수들
+    function tm1637Start(): void {
+        pins.digitalWritePin(_tm1637Dio, 1)
+        pins.digitalWritePin(_tm1637Clk, 1)
+        control.waitMicros(2)
+        pins.digitalWritePin(_tm1637Dio, 0)
+    }
+
+    function tm1637Stop(): void {
+        pins.digitalWritePin(_tm1637Clk, 0)
+        control.waitMicros(2)
+        pins.digitalWritePin(_tm1637Dio, 0)
+        control.waitMicros(2)
+        pins.digitalWritePin(_tm1637Clk, 1)
+        control.waitMicros(2)
+        pins.digitalWritePin(_tm1637Dio, 1)
+    }
+
+    function tm1637WriteByte(data: number): void {
+        for (let i = 0; i < 8; i++) {
+            pins.digitalWritePin(_tm1637Clk, 0)
+            control.waitMicros(2)
+            pins.digitalWritePin(_tm1637Dio, (data >> i) & 1)
+            control.waitMicros(2)
+            pins.digitalWritePin(_tm1637Clk, 1)
+            control.waitMicros(2)
+        }
+        // ACK
+        pins.digitalWritePin(_tm1637Clk, 0)
+        control.waitMicros(2)
+        pins.digitalWritePin(_tm1637Dio, 1)
+        control.waitMicros(2)
+        pins.digitalWritePin(_tm1637Clk, 1)
+        control.waitMicros(2)
+    }
+
+
     /********** WS2812B 네오픽셀 LED **********/
 
     // NeoPixel 포맷
@@ -439,297 +731,5 @@ namespace Displays01 {
     //% group="네오픽셀(NeoPixel)" weight=88
     export function neopixelPresetColor(color: NeoPixelColors): number {
         return color
-    }
-
-
-    /********** TM1637 7세그먼트 디스플레이 **********/
-
-    // TM1637 소수점 옵션
-    export enum TM1637Decimal {
-        //% block="decimal none"
-        None = 0,
-        //% block="decimal 1digit"
-        Dec1 = 1,
-        //% block="decimal 2digit"
-        Dec2 = 2,
-        //% block="decimal 3digit"
-        Dec3 = 3
-    }
-
-    // TM1637 음수 기호 옵션
-    export enum TM1637Negative {
-        //% block="show negative sign"
-        Show = 1,
-        //% block="hide negative sign"
-        Hide = 0
-    }
-
-    // TM1637 콜론 옵션
-    export enum TM1637Colon {
-        //% block="colon"
-        Colon = 1,
-        //% block="none"
-        None = 0
-    }
-
-    // TM1637 위치
-    export enum TM1637Position {
-        //% block="1st (left)"
-        Pos1 = 0,
-        //% block="2nd"
-        Pos2 = 1,
-        //% block="3rd"
-        Pos3 = 2,
-        //% block="4th (right)"
-        Pos4 = 3
-    }
-
-    // TM1637 핀 저장 변수
-    let _tm1637Clk: DigitalPin = DigitalPin.P2
-    let _tm1637Dio: DigitalPin = DigitalPin.P3
-    let _tm1637Brightness: number = 7
-    let _tm1637Colon: boolean = false
-    let _tm1637Buffer: number[] = [0, 0, 0, 0]
-
-    // 7세그먼트 폰트 (0-9, A-Z, 일부 특수문자)
-    const TM1637_FONT: number[] = [
-        0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F,  // 0-9
-        0x77, 0x7C, 0x39, 0x5E, 0x79, 0x71,  // A-F
-        0x3D, 0x76, 0x06, 0x1E, 0x76, 0x38, 0x15, 0x54, 0x3F,  // G-O
-        0x73, 0x67, 0x50, 0x6D, 0x78, 0x3E, 0x1C, 0x2A, 0x76, 0x6E, 0x5B,  // P-Z
-        0x00, 0x40  // 공백, 마이너스
-    ]
-
-    //% block="FND(TM1637) CLK pin %clk|DATA pin %dio set"
-    //% clk.defl=DigitalPin.P2 dio.defl=DigitalPin.P3
-    //% group="숫자표시장치(TM1637)" weight=88
-    //% inlineInputMode=inline
-    export function tm1637Init(clk: DigitalPin, dio: DigitalPin): void {
-        _tm1637Clk = clk
-        _tm1637Dio = dio
-        _tm1637Brightness = 7
-        _tm1637Colon = false
-        _tm1637Buffer = [0, 0, 0, 0]
-
-        // 초기화
-        tm1637Start()
-        tm1637WriteByte(0x40)  // 데이터 명령: 자동 주소 증가
-        tm1637Stop()
-
-        tm1637Clear()
-        tm1637SetBrightness(7)
-    }
-
-    //% block="FNDnumber show %num|%decimal|%negative"
-    //% num.defl=1234
-    //% group="숫자표시장치(TM1637)" weight=87
-    //% inlineInputMode=inline
-    export function tm1637ShowNumber(num: number, decimal: TM1637Decimal, negative: TM1637Negative): void {
-        let isNegative = num < 0
-        num = Math.abs(num)
-
-        // 소수점 처리
-        if (decimal != TM1637Decimal.None) {
-            num = Math.round(num * Math.pow(10, decimal))
-        }
-
-        let digits: number[] = [0, 0, 0, 0]
-        let startPos = 0
-
-        // 숫자 분리
-        for (let i = 3; i >= 0; i--) {
-            digits[i] = num % 10
-            num = Math.floor(num / 10)
-        }
-
-        // 음수 기호 처리
-        if (isNegative && negative == TM1637Negative.Show) {
-            // 앞쪽 0을 마이너스로 대체
-            for (let i = 0; i < 3; i++) {
-                if (digits[i] == 0) {
-                    _tm1637Buffer[i] = 0x40  // 마이너스
-                    startPos = i + 1
-                    break
-                }
-            }
-        }
-
-        // 버퍼에 숫자 저장
-        for (let i = startPos; i < 4; i++) {
-            _tm1637Buffer[i] = TM1637_FONT[digits[i]]
-            // 소수점 추가
-            if (decimal != TM1637Decimal.None && i == (3 - decimal)) {
-                _tm1637Buffer[i] |= 0x80
-            }
-        }
-
-        // 콜론 추가 (2번째 자리)
-        if (_tm1637Colon) {
-            _tm1637Buffer[1] |= 0x80
-        }
-
-        tm1637Display()
-    }
-
-    //% block="FNDtime show %hour|: %minute|%colon show"
-    //% hour.min=0 hour.max=23 hour.defl=12
-    //% minute.min=0 minute.max=59 minute.defl=30
-    //% group="숫자표시장치(TM1637)" weight=86
-    //% inlineInputMode=inline
-    export function tm1637ShowTime(hour: number, minute: number, colon: TM1637Colon): void {
-        _tm1637Buffer[0] = TM1637_FONT[Math.floor(hour / 10)]
-        _tm1637Buffer[1] = TM1637_FONT[hour % 10]
-        _tm1637Buffer[2] = TM1637_FONT[Math.floor(minute / 10)]
-        _tm1637Buffer[3] = TM1637_FONT[minute % 10]
-
-        // 콜론 표시
-        if (colon == TM1637Colon.Colon) {
-            _tm1637Buffer[1] |= 0x80
-        }
-
-        tm1637Display()
-    }
-
-    //% block="FND text show %text |scroll delay %delay ms"
-    //% text.defl="Hello"
-    //% delay.defl=500 delay.min=100 delay.max=2000
-    //% group="숫자표시장치(TM1637)" weight=85
-    //% inlineInputMode=inline
-    export function tm1637ShowText(text: string, delay: number): void {
-        text = text.toUpperCase()
-        let len = text.length
-
-        if (len <= 4) {
-            // 4자 이하면 바로 표시
-            for (let i = 0; i < 4; i++) {
-                if (i < len) {
-                    _tm1637Buffer[i] = tm1637CharToSegment(text.charCodeAt(i))
-                } else {
-                    _tm1637Buffer[i] = 0
-                }
-            }
-            tm1637Display()
-        } else {
-            // 4자 초과면 스크롤
-            let padded = "    " + text + "    "
-            for (let pos = 0; pos < padded.length - 3; pos++) {
-                for (let i = 0; i < 4; i++) {
-                    _tm1637Buffer[i] = tm1637CharToSegment(padded.charCodeAt(pos + i))
-                }
-                tm1637Display()
-                basic.pause(delay)
-            }
-        }
-    }
-
-    //% block="FND position %pos|at number %digit show"
-    //% digit.min=0 digit.max=9 digit.defl=8
-    //% group="숫자표시장치(TM1637)" weight=84
-    //% inlineInputMode=inline
-    export function tm1637ShowDigitAt(pos: TM1637Position, digit: number): void {
-        _tm1637Buffer[pos] = TM1637_FONT[digit % 10]
-        tm1637Display()
-    }
-
-    //% block="FNDscreen clear"
-    //% group="숫자표시장치(TM1637)" weight=83
-    export function tm1637Clear(): void {
-        _tm1637Buffer = [0, 0, 0, 0]
-        tm1637Display()
-    }
-
-    //% block="FNDbrightness set %brightness"
-    //% brightness.min=0 brightness.max=7 brightness.defl=7
-    //% group="숫자표시장치(TM1637)" weight=79
-    export function tm1637SetBrightness(brightness: number): void {
-        _tm1637Brightness = Math.clamp(0, 7, brightness)
-
-        tm1637Start()
-        if (_tm1637Brightness == 0) {
-            tm1637WriteByte(0x80)  // 디스플레이 OFF
-        } else {
-            tm1637WriteByte(0x88 | _tm1637Brightness)  // 디스플레이 ON + 밝기
-        }
-        tm1637Stop()
-    }
-
-    //% block="FNDcolon %colon show"
-    //% group="숫자표시장치(TM1637)" weight=78
-    export function tm1637SetColon(colon: TM1637Colon): void {
-        _tm1637Colon = (colon == TM1637Colon.Colon)
-        if (_tm1637Colon) {
-            _tm1637Buffer[1] |= 0x80
-        } else {
-            _tm1637Buffer[1] &= 0x7F
-        }
-        tm1637Display()
-    }
-
-    // 문자를 7세그먼트 코드로 변환
-    function tm1637CharToSegment(charCode: number): number {
-        if (charCode >= 48 && charCode <= 57) {
-            // 0-9
-            return TM1637_FONT[charCode - 48]
-        } else if (charCode >= 65 && charCode <= 90) {
-            // A-Z
-            return TM1637_FONT[charCode - 65 + 10]
-        } else if (charCode == 32) {
-            // 공백
-            return 0x00
-        } else if (charCode == 45) {
-            // 마이너스
-            return 0x40
-        }
-        return 0x00
-    }
-
-    // TM1637 디스플레이 갱신
-    function tm1637Display(): void {
-        tm1637Start()
-        tm1637WriteByte(0xC0)  // 주소 명령: 첫 번째 주소
-        for (let i = 0; i < 4; i++) {
-            tm1637WriteByte(_tm1637Buffer[i])
-        }
-        tm1637Stop()
-
-        tm1637Start()
-        tm1637WriteByte(0x88 | _tm1637Brightness)
-        tm1637Stop()
-    }
-
-    // TM1637 통신 함수들
-    function tm1637Start(): void {
-        pins.digitalWritePin(_tm1637Dio, 1)
-        pins.digitalWritePin(_tm1637Clk, 1)
-        control.waitMicros(2)
-        pins.digitalWritePin(_tm1637Dio, 0)
-    }
-
-    function tm1637Stop(): void {
-        pins.digitalWritePin(_tm1637Clk, 0)
-        control.waitMicros(2)
-        pins.digitalWritePin(_tm1637Dio, 0)
-        control.waitMicros(2)
-        pins.digitalWritePin(_tm1637Clk, 1)
-        control.waitMicros(2)
-        pins.digitalWritePin(_tm1637Dio, 1)
-    }
-
-    function tm1637WriteByte(data: number): void {
-        for (let i = 0; i < 8; i++) {
-            pins.digitalWritePin(_tm1637Clk, 0)
-            control.waitMicros(2)
-            pins.digitalWritePin(_tm1637Dio, (data >> i) & 1)
-            control.waitMicros(2)
-            pins.digitalWritePin(_tm1637Clk, 1)
-            control.waitMicros(2)
-        }
-        // ACK
-        pins.digitalWritePin(_tm1637Clk, 0)
-        control.waitMicros(2)
-        pins.digitalWritePin(_tm1637Dio, 1)
-        control.waitMicros(2)
-        pins.digitalWritePin(_tm1637Clk, 1)
-        control.waitMicros(2)
     }
 }
