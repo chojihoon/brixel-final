@@ -459,15 +459,15 @@ namespace Sensors03 {
     // I2C 기반 무게 센서 (NAU7802, SparkFun Qwiic Scale 등)
     // 24비트 ADC로 고정밀 무게 측정 지원
 
-    // I2C 무게센서 데이터 바이트 타입
+    // I2C Weight Sensor data byte type
     export enum I2CWeightByte {
-        //% block="0 (상태)"
+        //% block="0 (status)"
         Status = 0,
-        //% block="1 (데이터 High)"
+        //% block="1 (data High)"
         DataHigh = 1,
-        //% block="2 (데이터 Mid)"
+        //% block="2 (data Mid)"
         DataMid = 2,
-        //% block="3 (데이터 Low)"
+        //% block="3 (data Low)"
         DataLow = 3
     }
 
@@ -481,7 +481,7 @@ namespace Sensors03 {
      * I2C 무게센서 주소 설정
      * @param addr I2C 주소 (기본값: 0x2A = 42, 또는 99 등)
      */
-    //% block="I2C 무게센서 설정 주소 $addr"
+    //% block="I2C Weight Sensor set address $addr"
     //% addr.defl=99
     //% group="I2C 무게센서" weight=198
     export function i2cWeightSetAddress(addr: number): void {
@@ -512,7 +512,7 @@ namespace Sensors03 {
      * I2C 센서에서 무게 읽기
      * @returns 보정된 무게 값
      */
-    //% block="I2C 센서에서 무게 읽기"
+    //% block="I2C Weight Sensor read weight"
     //% group="I2C 무게센서" weight=197
     export function i2cWeightRead(): number {
         let raw = i2cWeightReadRaw24bit()
@@ -523,7 +523,7 @@ namespace Sensors03 {
      * I2C 무게센서 사용 가능 여부 확인
      * @returns 센서가 준비되면 true
      */
-    //% block="I2C 무게센서가 사용가능함"
+    //% block="I2C Weight Sensor is available"
     //% group="I2C 무게센서" weight=196
     export function i2cWeightIsAvailable(): boolean {
         if (!_i2cWeightInitialized) {
@@ -546,7 +546,7 @@ namespace Sensors03 {
      * @param byteType 읽을 바이트 타입
      * @returns 해당 바이트 값
      */
-    //% block="I2C 센서에서 원시 데이터 byte Byte $byteType 읽기"
+    //% block="I2C Weight Sensor read raw byte $byteType"
     //% byteType.defl=I2CWeightByte.Status
     //% group="I2C 무게센서" weight=195
     export function i2cWeightReadByte(byteType: I2CWeightByte): number {
@@ -570,7 +570,7 @@ namespace Sensors03 {
      * I2C 무게센서 영점 조정 (Tare)
      * @param samples 평균을 낼 샘플 수
      */
-    //% block="I2C 무게센서 영점 조정 샘플수 $samples"
+    //% block="I2C Weight Sensor tare samples $samples"
     //% samples.defl=10
     //% group="I2C 무게센서" weight=194
     export function i2cWeightTare(samples: number): void {
@@ -586,7 +586,7 @@ namespace Sensors03 {
      * I2C 무게센서 스케일 설정
      * @param scale 스케일 값 (예: 알려진 무게로 나눈 원시 값)
      */
-    //% block="I2C 무게센서 스케일 설정 $scale"
+    //% block="I2C Weight Sensor set scale $scale"
     //% scale.defl=1
     //% group="I2C 무게센서" weight=193
     export function i2cWeightSetScale(scale: number): void {
@@ -597,7 +597,7 @@ namespace Sensors03 {
      * I2C 무게센서 24비트 원시 값 읽기
      * @returns 24비트 ADC 값
      */
-    //% block="I2C 무게센서 원시값(24bit) 읽기"
+    //% block="I2C Weight Sensor read raw 24bit"
     //% group="I2C 무게센서" weight=192
     export function i2cWeightReadRaw24bit(): number {
         try {
@@ -629,7 +629,7 @@ namespace Sensors03 {
      * I2C 무게센서 게인 설정
      * @param gain 게인 값 (1, 2, 4, 8, 16, 32, 64, 128)
      */
-    //% block="I2C 무게센서 게인 설정 $gain"
+    //% block="I2C Weight Sensor set gain $gain"
     //% gain.defl=128
     //% group="I2C 무게센서" weight=191
     export function i2cWeightSetGain(gain: number): void {
@@ -1360,59 +1360,59 @@ namespace Sensors03 {
     // 지문 센서는 시리얼 통신으로 동작합니다.
     // AS608, R307, FPM10A 등 호환 센서 지원
 
-    // 시리얼 타입
+    // Serial type
     export enum FingerprintSerial {
-        //% block="소프트웨어 시리얼"
+        //% block="software serial"
         Software = 0,
-        //% block="하드웨어 시리얼"
+        //% block="hardware serial"
         Hardware = 1
     }
 
-    // 지문 등록 과정
+    // Fingerprint enroll step
     export enum FingerprintEnrollStep {
-        //% block="이미지 가져오기"
+        //% block="get image"
         GetImage = 1,
-        //% block="이미지 변환"
+        //% block="image to tz"
         Image2Tz = 2,
-        //% block="모델 생성"
+        //% block="create model"
         CreateModel = 3,
-        //% block="저장"
+        //% block="store"
         Store = 4
     }
 
-    // 지문 인식 모드
+    // Fingerprint search mode
     export enum FingerprintSearchMode {
-        //% block="빠른"
+        //% block="fast"
         Fast = 0,
-        //% block="정확한"
+        //% block="accurate"
         Accurate = 1
     }
 
-    // 지문 인식 결과 타입
+    // Fingerprint result type
     export enum FingerprintResult {
-        //% block="지문 ID"
+        //% block="finger ID"
         FingerID = 0,
-        //% block="일치 점수"
+        //% block="confidence"
         Confidence = 1,
-        //% block="상태 코드"
+        //% block="status code"
         StatusCode = 2
     }
 
-    // 지문 데이터베이스 동작
+    // Fingerprint database action
     export enum FingerprintDBAction {
-        //% block="ID 삭제"
+        //% block="delete ID"
         Delete = 0,
-        //% block="전체 삭제"
+        //% block="empty all"
         Empty = 1,
-        //% block="개수 확인"
+        //% block="count"
         Count = 2
     }
 
-    // LED 제어
+    // LED control
     export enum FingerprintLED {
-        //% block="켜기"
+        //% block="on"
         On = 1,
-        //% block="끄기"
+        //% block="off"
         Off = 0
     }
 
@@ -1441,7 +1441,7 @@ namespace Sensors03 {
      * @param tx TX 핀
      * @param baudRate 통신 속도
      */
-    //% block="지문 센서 설정: 시리얼 $serialType , RX핀 $rx , TX핀 $tx , 통신 속도 $baudRate"
+    //% block="Fingerprint Sensor setup: serial $serialType, RX $rx, TX $tx, baud $baudRate"
     //% serialType.defl=FingerprintSerial.Software
     //% rx.defl=SerialPin.P2
     //% tx.defl=SerialPin.P8
@@ -1472,7 +1472,7 @@ namespace Sensors03 {
      * @param id 지문 ID (1~127)
      * @returns 성공 여부
      */
-    //% block="지문 등록 과정 $step , ID 번호: $id"
+    //% block="Fingerprint enroll $step, ID: $id"
     //% step.defl=FingerprintEnrollStep.GetImage
     //% id.min=1 id.max=127 id.defl=1
     //% group="지문센서" weight=184
@@ -1507,7 +1507,7 @@ namespace Sensors03 {
      * @param mode 검색 모드
      * @returns 성공 여부
      */
-    //% block="지문 인식 모드: $mode 검색"
+    //% block="Fingerprint search mode: $mode"
     //% mode.defl=FingerprintSearchMode.Fast
     //% group="지문센서" weight=183
     export function fingerprintSearch(mode: FingerprintSearchMode): boolean {
@@ -1549,7 +1549,7 @@ namespace Sensors03 {
      * @param resultType 결과 타입
      * @returns 결과 값
      */
-    //% block="지문 인식 결과: $resultType"
+    //% block="Fingerprint result: $resultType"
     //% resultType.defl=FingerprintResult.FingerID
     //% group="지문센서" weight=182
     export function fingerprintGetResult(resultType: FingerprintResult): number {
@@ -1571,7 +1571,7 @@ namespace Sensors03 {
      * @param id ID 번호 (삭제 시 사용)
      * @returns 결과 값
      */
-    //% block="지문 데이터베이스 $action , ID: $id"
+    //% block="Fingerprint database $action, ID: $id"
     //% action.defl=FingerprintDBAction.Delete
     //% id.min=1 id.max=127 id.defl=1
     //% group="지문센서" weight=181
@@ -1607,7 +1607,7 @@ namespace Sensors03 {
      * 지문 센서 LED 제어
      * @param state LED 상태
      */
-    //% block="지문 센서 LED 제어 $state"
+    //% block="Fingerprint Sensor LED $state"
     //% state.defl=FingerprintLED.On
     //% group="지문센서" weight=180
     export function fingerprintLED(state: FingerprintLED): void {
@@ -1703,7 +1703,7 @@ namespace Sensors03 {
      * @param beta 베타 계수 (보통 3950)
      * @param seriesR 직렬 저항 (보통 10000Ω)
      */
-    //% block="서미스터 온도 센서: 아날로그 핀 $pin , 공칭 저항 $nominalR Ω, 베타 계수 $beta , 직렬 저항 $seriesR Ω 설정"
+    //% block="Thermistor sensor: pin $pin, nominal $nominalR Ω, beta $beta, series $seriesR Ω setup"
     //% pin.defl=AnalogPin.P0
     //% nominalR.defl=10000
     //% beta.defl=3950
@@ -1722,7 +1722,7 @@ namespace Sensors03 {
      * @param unit 온도 단위
      * @returns 온도 값
      */
-    //% block="서미스터 온도 센서 온도 측정 ( $unit )"
+    //% block="Thermistor read temperature ($unit)"
     //% unit.defl=TempUnit.Celsius
     //% group="서미스터(NTC)" weight=188
     export function thermistorReadTemp(unit: TempUnit): number {
@@ -1751,7 +1751,7 @@ namespace Sensors03 {
      * 서미스터 온도 센서 원본 값 (ADC 값)
      * @returns ADC 원본 값 (0~1023)
      */
-    //% block="서미스터 온도 센서 원본 값"
+    //% block="Thermistor read raw value"
     //% group="서미스터(NTC)" weight=187
     export function thermistorReadRaw(): number {
         return pins.analogReadPin(_thermistorPin)
@@ -1761,7 +1761,7 @@ namespace Sensors03 {
      * 서미스터 온도 센서 저항 값
      * @returns 계산된 저항 값 (Ω)
      */
-    //% block="서미스터 온도 센서 저항 값"
+    //% block="Thermistor read resistance"
     //% group="서미스터(NTC)" weight=186
     export function thermistorReadResistance(): number {
         let adcValue = pins.analogReadPin(_thermistorPin)
