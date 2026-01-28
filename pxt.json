@@ -24,7 +24,11 @@
         "README.md",
         "icon.png",
         "_locales/en/brixel-ext-strings.json",
-        "_locales/ko/brixel-ext-strings.json"
+        "_locales/ko/brixel-ext-strings.json",
+        "_locales/ar/brixel-ext-strings.json",
+        "_locales/bg/brixel-ext-strings.json",
+        "_locales/ca/brixel-ext-strings.json",
+        "_locales/cs/brixel-ext-strings.json"
     ],
     "testFiles": [],
     "supportedTargets": [
