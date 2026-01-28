@@ -4,8 +4,48 @@
  */
 
 //% weight=1080 color=#FF6F00 icon="\uf0e7" block="03. Sensors"
-//% groups="['초음파(HC-SR04)', '온습도(DHT11/DHT22)', '물온도(DS18B20)', '무게(HX711)', 'I2C 무게센서', 'Rotary Encoder', '서미스터(NTC)', '미세먼지(PMS)', 'CO2센서(MHZ19)', '전기전도도(TDS)', 'pH', '지문센서', '탁도(Turbidity)', 'UV Sensor', '온도(LM35)', '미세먼지(GP2Y0A21YK)', '초음파(US-100)', '빛(TEMT6000)', '가스(MQ-2)', '가스(MQ-135)', 'CO2센서(CCS811)', 'Joystick', 'Keypad', 'Button', 'Potentiometer', 'Other Sensors']"
+//% groups="['초음파(HC-SR04)', '온습도(DHT11/DHT22)', '물온도(DS18B20)', '무게(HX711)', 'I2C 무게센서', '미세먼지(PMS)', 'Rotary Encoder', 'CO2센서(MHZ19)', '전기전도도(TDS)', 'pH', '지문센서', '서미스터(NTC)', '탁도(Turbidity)', 'UV Sensor', '온도(LM35)', '미세먼지(GP2Y0A21YK)', '초음파(US-100)', '빛(TEMT6000)', '가스(MQ-2)', '가스(MQ-135)', 'CO2센서(CCS811)', 'Joystick', 'Keypad', 'Button', 'Potentiometer', 'Other Sensors']"
 namespace Sensors03 {
+
+
+    /********** HC-SR04 초음파 센서 **********/
+
+    // 거리 단위
+    export enum DistanceUnit {
+        //% block="cm"
+        Centimeter = 0,
+        //% block="inch"
+        Inch = 1
+    }
+
+    // HC-SR04 핀 저장 변수
+    let _hcsr04Trig: DigitalPin = DigitalPin.P7
+    let _hcsr04Echo: DigitalPin = DigitalPin.P8
+
+    //% block="HC-SR04 set trigger pin %trig echo pin %echo"
+    //% trig.defl=DigitalPin.P7 echo.defl=DigitalPin.P8
+    //% group="초음파(HC-SR04)" weight=230
+    export function hcsr04SetPins(trig: DigitalPin, echo: DigitalPin): void {
+        _hcsr04Trig = trig
+        _hcsr04Echo = echo
+    }
+
+    //% block="HC-SR04 read distance unit %unit"
+    //% group="초음파(HC-SR04)" weight=229
+    export function hcsr04Read(unit: DistanceUnit): number {
+        pins.digitalWritePin(_hcsr04Trig, 0)
+        control.waitMicros(2)
+        pins.digitalWritePin(_hcsr04Trig, 1)
+        control.waitMicros(10)
+        pins.digitalWritePin(_hcsr04Trig, 0)
+        let d = pins.pulseIn(_hcsr04Echo, PulseValue.High, 30000)
+        let cm = Math.floor(d / 58)
+
+        if (unit == DistanceUnit.Inch) {
+            return Math.floor(cm / 2.54)
+        }
+        return cm
+    }
 
 
     /********** DHT11/DHT22 센서 **********/
@@ -265,667 +305,6 @@ namespace Sensors03 {
             control.waitMicros(55)
         }
         return byte
-    }
-
-
-    /********** LM35 센서 **********/
-
-    //% block="LM35 read temperature pin %pin unit %unit"
-    //% group="온도(LM35)" weight=125
-    export function lm35Read(pin: AnalogPin, unit: TempUnit): number {
-        let tempC = pins.analogReadPin(pin) * 0.48828125
-        if (unit == TempUnit.Fahrenheit) {
-            return tempC * 9 / 5 + 32
-        }
-        return tempC
-    }
-
-
-    /********** HC-SR04 초음파 센서 **********/
-
-    // 거리 단위
-    export enum DistanceUnit {
-        //% block="cm"
-        Centimeter = 0,
-        //% block="inch"
-        Inch = 1
-    }
-
-    // HC-SR04 핀 저장 변수
-    let _hcsr04Trig: DigitalPin = DigitalPin.P7
-    let _hcsr04Echo: DigitalPin = DigitalPin.P8
-
-    //% block="HC-SR04 set trigger pin %trig echo pin %echo"
-    //% trig.defl=DigitalPin.P7 echo.defl=DigitalPin.P8
-    //% group="초음파(HC-SR04)" weight=230
-    export function hcsr04SetPins(trig: DigitalPin, echo: DigitalPin): void {
-        _hcsr04Trig = trig
-        _hcsr04Echo = echo
-    }
-
-    //% block="HC-SR04 read distance unit %unit"
-    //% group="초음파(HC-SR04)" weight=229
-    export function hcsr04Read(unit: DistanceUnit): number {
-        pins.digitalWritePin(_hcsr04Trig, 0)
-        control.waitMicros(2)
-        pins.digitalWritePin(_hcsr04Trig, 1)
-        control.waitMicros(10)
-        pins.digitalWritePin(_hcsr04Trig, 0)
-        let d = pins.pulseIn(_hcsr04Echo, PulseValue.High, 30000)
-        let cm = Math.floor(d / 58)
-
-        if (unit == DistanceUnit.Inch) {
-            return Math.floor(cm / 2.54)
-        }
-        return cm
-    }
-
-
-    /********** GP2Y0A21YK 적외선 거리 센서 **********/
-
-    //% block="GP2Y0A21YK read distance pin %pin unit %unit"
-    //% group="미세먼지(GP2Y0A21YK)" weight=120
-    export function gp2y0a21ykRead(pin: AnalogPin, unit: DistanceUnit): number {
-        let v = pins.analogReadPin(pin)
-        let cm = Math.floor(12343.85 / (v - 0.42))
-        if (unit == DistanceUnit.Inch) {
-            return Math.floor(cm / 2.54)
-        }
-        return cm
-    }
-
-
-    /********** US-100 초음파 센서 **********/
-
-    // US-100 핀 저장 변수
-    let _us100Trig: DigitalPin = DigitalPin.P1
-    let _us100Echo: DigitalPin = DigitalPin.P2
-
-    //% block="US-100 set trigger pin %trig echo pin %echo"
-    //% trig.defl=DigitalPin.P1 echo.defl=DigitalPin.P2
-    //% group="초음파(US-100)" weight=115
-    export function us100SetPins(trig: DigitalPin, echo: DigitalPin): void {
-        _us100Trig = trig
-        _us100Echo = echo
-    }
-
-    //% block="US-100 distance measure unit %unit"
-    //% group="초음파(US-100)" weight=114
-    export function us100Read(unit: DistanceUnit): number {
-        pins.digitalWritePin(_us100Trig, 0)
-        control.waitMicros(2)
-        pins.digitalWritePin(_us100Trig, 1)
-        control.waitMicros(10)
-        pins.digitalWritePin(_us100Trig, 0)
-        let d = pins.pulseIn(_us100Echo, PulseValue.High, 30000)
-        let cm = Math.floor(d / 58)
-
-        if (unit == DistanceUnit.Inch) {
-            return Math.floor(cm / 2.54)
-        }
-        return cm
-    }
-
-
-    /********** TEMT6000 조도 센서 **********/
-
-    //% block="TEMT6000 light intensity read pin %pin"
-    //% group="빛(TEMT6000)" weight=110
-    export function temt6000Read(pin: AnalogPin): number {
-        return pins.analogReadPin(pin)
-    }
-
-
-    /********** 자외선(UV) 센서 **********/
-
-    // 자외선 센서는 UV 지수를 측정합니다.
-    // ML8511, GUVA-S12SD 등 아날로그 UV 센서 지원
-
-    // UV 데이터 타입
-    export enum UVDataType {
-        //% block="UV index"
-        UVIndex = 0,
-        //% block="voltage(mV)"
-        Voltage = 1,
-        //% block="intensity(mW/cm²)"
-        Intensity = 2
-    }
-
-    // UV 보정 타입
-    export enum UVCalibration {
-        //% block="indoor (zero adjust)"
-        Indoor = 0,
-        //% block="outdoor (sunlight)"
-        Outdoor = 1
-    }
-
-    // UV 센서 상태 변수
-    let _uvPin: AnalogPin = AnalogPin.P0
-    let _uvRefVoltage: number = 3300  // mV
-    let _uvOffsetVoltage: number = 990  // 실내 기준 전압 (mV)
-
-    //% block="UV sensor setup: analog pin %pin"
-    //% pin.defl=AnalogPin.P0
-    //% group="UV Sensor" weight=135
-    export function uvInit(pin: AnalogPin): void {
-        _uvPin = pin
-        _uvRefVoltage = 3300
-        _uvOffsetVoltage = 990
-    }
-
-    //% block="UV sensor calibrate %calType, ref voltage: %voltage mV"
-    //% calType.defl=UVCalibration.Indoor
-    //% voltage.defl=990 voltage.min=0 voltage.max=3300
-    //% group="UV Sensor" weight=134
-    //% inlineInputMode=inline
-    export function uvCalibrate(calType: UVCalibration, voltage: number): void {
-        if (calType == UVCalibration.Indoor) {
-            // 실내에서 현재 전압을 영점으로 설정
-            if (voltage > 0) {
-                _uvOffsetVoltage = voltage
-            } else {
-                // 자동 측정
-                let analogSum = 0
-                for (let i = 0; i < 10; i++) {
-                    analogSum += pins.analogReadPin(_uvPin)
-                    basic.pause(10)
-                }
-                _uvOffsetVoltage = (analogSum / 10) * _uvRefVoltage / 1023
-            }
-        }
-    }
-
-    //% block="UV sensor read: %dtype"
-    //% dtype.defl=UVDataType.UVIndex
-    //% group="UV Sensor" weight=133
-    export function uvRead(dtype: UVDataType): number {
-        // 아날로그 값 읽기 (여러 번 읽어서 평균)
-        let analogSum = 0
-        for (let i = 0; i < 10; i++) {
-            analogSum += pins.analogReadPin(_uvPin)
-            basic.pause(10)
-        }
-        let analogValue = analogSum / 10
-
-        // 전압 계산 (mV)
-        let voltage = analogValue * _uvRefVoltage / 1023
-
-        if (dtype == UVDataType.Voltage) {
-            return Math.round(voltage)
-        }
-
-        // UV 강도 계산 (mW/cm²)
-        // ML8511 기준: 출력 전압 1V = 0 mW/cm², 2.8V = 15 mW/cm²
-        let intensity = (voltage - _uvOffsetVoltage) / 120  // 약 120mV per mW/cm²
-        if (intensity < 0) intensity = 0
-
-        if (dtype == UVDataType.Intensity) {
-            return Math.round(intensity * 100) / 100
-        }
-
-        // UV 지수 계산 (0-11+)
-        // UV Index = Intensity / 0.25 (대략적인 변환)
-        let uvIndex = intensity / 0.25
-        if (uvIndex < 0) uvIndex = 0
-        if (uvIndex > 15) uvIndex = 15
-
-        return Math.round(uvIndex * 10) / 10
-    }
-
-
-    /********** MQ-2 가스 센서 **********/
-
-    //% block="MQ-2 gas concentration read pin %pin"
-    //% group="가스(MQ-2)" weight=105
-    export function mq2Read(pin: AnalogPin): number {
-        return pins.analogReadPin(pin)
-    }
-
-
-    /********** MQ-135 공기질 센서 **********/
-
-    //% block="MQ-135 air quality read pin %pin"
-    //% group="가스(MQ-135)" weight=100
-    export function mq135Read(pin: AnalogPin): number {
-        return pins.analogReadPin(pin)
-    }
-
-
-    /********** CCS811 CO2/VOC 센서 **********/
-
-    // CCS811 측정 타입
-    export enum CCS811Type {
-        //% block="CO2(ppm)"
-        CO2 = 0,
-        //% block="TVOC(ppb)"
-        TVOC = 1
-    }
-
-    // CCS811 데이터 저장 변수
-    let _ccs811Addr: number = 0x5A
-    let _ccs811CO2: number = 0
-    let _ccs811TVOC: number = 0
-
-    //% block="CCS811 init"
-    //% group="CO2센서(CCS811)" weight=95
-    export function ccs811Init(): void {
-        // 앱 시작 명령
-        pins.i2cWriteNumber(_ccs811Addr, 0xF4, NumberFormat.UInt8BE)
-        basic.pause(100)
-        // 측정 모드 설정 (1초 간격)
-        pins.i2cWriteNumber(_ccs811Addr, 0x0110, NumberFormat.UInt16BE)
-        basic.pause(100)
-    }
-
-    //% block="CCS811 read %ctype"
-    //% group="CO2센서(CCS811)" weight=94
-    export function ccs811Read(ctype: CCS811Type): number {
-        // 결과 레지스터 읽기
-        pins.i2cWriteNumber(_ccs811Addr, 0x02, NumberFormat.UInt8BE)
-        let buf = pins.i2cReadBuffer(_ccs811Addr, 4)
-
-        _ccs811CO2 = (buf[0] << 8) | buf[1]
-        _ccs811TVOC = (buf[2] << 8) | buf[3]
-
-        if (ctype == CCS811Type.CO2) {
-            return _ccs811CO2
-        }
-        return _ccs811TVOC
-    }
-
-
-    /********** PMS 미세먼지 센서 (PMS5003, PMS7003 등) **********/
-
-    // PMS-X003 시리즈는 레이저 산란 방식의 미세먼지 센서입니다.
-    // PM1.0, PM2.5, PM10 농도를 측정합니다.
-
-    // PMS 시리얼 포트 타입
-    export enum PMSSerial {
-        //% block="SoftwareSerial"
-        Software = 0,
-        //% block="HardwareSerial"
-        Hardware = 1
-    }
-
-    // PMS 데이터 타입
-    export enum PMSDataType {
-        //% block="PM1.0 (std)"
-        PM1_0_STD = 0,
-        //% block="PM2.5 (std)"
-        PM2_5_STD = 1,
-        //% block="PM10 (std)"
-        PM10_STD = 2,
-        //% block="PM1.0 (atm)"
-        PM1_0_ATM = 3,
-        //% block="PM2.5 (atm)"
-        PM2_5_ATM = 4,
-        //% block="PM10 (atm)"
-        PM10_ATM = 5
-    }
-
-    // PMS 모드
-    export enum PMSMode {
-        //% block="active"
-        Active = 0,
-        //% block="passive"
-        Passive = 1
-    }
-
-    // PMS 전원 상태
-    export enum PMSPower {
-        //% block="wakeup"
-        Wakeup = 0,
-        //% block="sleep"
-        Sleep = 1
-    }
-
-    // PMS 상태 변수
-    let _pmsTx: SerialPin = SerialPin.P1
-    let _pmsRx: SerialPin = SerialPin.P2
-    let _pmsData: number[] = [0, 0, 0, 0, 0, 0]  // PM1.0_STD, PM2.5_STD, PM10_STD, PM1.0_ATM, PM2.5_ATM, PM10_ATM
-    let _pmsReady: boolean = false
-    let _pmsBuffer: number[] = []
-
-    //% block="PM sensor(PMS-X003): serial %serialType, RX %rx, TX %tx, baud %baud setup"
-    //% serialType.defl=PMSSerial.Software
-    //% rx.defl=SerialPin.P2
-    //% tx.defl=SerialPin.P1
-    //% baud.defl=9600
-    //% group="미세먼지(PMS)" weight=185
-    //% inlineInputMode=inline
-    export function pmsInit(serialType: PMSSerial, rx: SerialPin, tx: SerialPin, baud: number): void {
-        _pmsRx = rx
-        _pmsTx = tx
-        serial.redirect(tx, rx, baud)
-        _pmsReady = false
-        _pmsBuffer = []
-        basic.pause(1000)  // 센서 안정화 대기
-    }
-
-    //% block="PMS PM sensor power %power"
-    //% power.defl=PMSPower.Wakeup
-    //% group="미세먼지(PMS)" weight=184
-    export function pmsPower(power: PMSPower): void {
-        if (power == PMSPower.Sleep) {
-            // 슬립 명령: 42 4D E4 00 00 01 73
-            let cmd = pins.createBuffer(7)
-            cmd[0] = 0x42
-            cmd[1] = 0x4D
-            cmd[2] = 0xE4
-            cmd[3] = 0x00
-            cmd[4] = 0x00
-            cmd[5] = 0x01
-            cmd[6] = 0x73
-            serial.writeBuffer(cmd)
-        } else {
-            // 깨우기 명령: 42 4D E4 00 01 01 74
-            let cmd = pins.createBuffer(7)
-            cmd[0] = 0x42
-            cmd[1] = 0x4D
-            cmd[2] = 0xE4
-            cmd[3] = 0x00
-            cmd[4] = 0x01
-            cmd[5] = 0x01
-            cmd[6] = 0x74
-            serial.writeBuffer(cmd)
-            basic.pause(1000)  // 깨우기 후 안정화
-        }
-    }
-
-    //% block="PMS PM sensor mode %mode"
-    //% mode.defl=PMSMode.Active
-    //% group="미세먼지(PMS)" weight=183
-    export function pmsSetMode(mode: PMSMode): void {
-        if (mode == PMSMode.Passive) {
-            // 패시브 모드: 42 4D E1 00 00 01 70
-            let cmd = pins.createBuffer(7)
-            cmd[0] = 0x42
-            cmd[1] = 0x4D
-            cmd[2] = 0xE1
-            cmd[3] = 0x00
-            cmd[4] = 0x00
-            cmd[5] = 0x01
-            cmd[6] = 0x70
-            serial.writeBuffer(cmd)
-        } else {
-            // 활성 모드: 42 4D E1 00 01 01 71
-            let cmd = pins.createBuffer(7)
-            cmd[0] = 0x42
-            cmd[1] = 0x4D
-            cmd[2] = 0xE1
-            cmd[3] = 0x00
-            cmd[4] = 0x01
-            cmd[5] = 0x01
-            cmd[6] = 0x71
-            serial.writeBuffer(cmd)
-        }
-    }
-
-    //% block="PMS PM sensor read %dtype"
-    //% dtype.defl=PMSDataType.PM2_5_STD
-    //% group="미세먼지(PMS)" weight=182
-    export function pmsRead(dtype: PMSDataType): number {
-        pmsParseData()
-        return _pmsData[dtype]
-    }
-
-    //% block="PMS PM sensor request read"
-    //% group="미세먼지(PMS)" weight=181
-    export function pmsRequestRead(): void {
-        // 수동 읽기 요청: 42 4D E2 00 00 01 71
-        let cmd = pins.createBuffer(7)
-        cmd[0] = 0x42
-        cmd[1] = 0x4D
-        cmd[2] = 0xE2
-        cmd[3] = 0x00
-        cmd[4] = 0x00
-        cmd[5] = 0x01
-        cmd[6] = 0x71
-        serial.writeBuffer(cmd)
-    }
-
-    //% block="PMS PM sensor data ready"
-    //% group="미세먼지(PMS)" weight=180
-    export function pmsDataReady(): boolean {
-        pmsParseData()
-        return _pmsReady
-    }
-
-    // PMS 데이터 파싱 (내부 함수)
-    function pmsParseData(): void {
-        _pmsReady = false
-
-        // 시리얼 버퍼에서 데이터 읽기
-        let available = serial.readBuffer(32)
-        if (available.length < 32) return
-
-        // 시작 바이트 찾기 (0x42 0x4D)
-        let startIndex = -1
-        for (let i = 0; i < available.length - 1; i++) {
-            if (available[i] == 0x42 && available[i + 1] == 0x4D) {
-                startIndex = i
-                break
-            }
-        }
-
-        if (startIndex < 0 || startIndex + 32 > available.length) return
-
-        // 프레임 길이 확인
-        let frameLen = (available[startIndex + 2] << 8) | available[startIndex + 3]
-        if (frameLen != 28) return
-
-        // 체크섬 계산
-        let checksum = 0
-        for (let i = 0; i < 30; i++) {
-            checksum += available[startIndex + i]
-        }
-        let receivedChecksum = (available[startIndex + 30] << 8) | available[startIndex + 31]
-
-        if (checksum != receivedChecksum) return
-
-        // 데이터 추출
-        _pmsData[0] = (available[startIndex + 4] << 8) | available[startIndex + 5]   // PM1.0 표준
-        _pmsData[1] = (available[startIndex + 6] << 8) | available[startIndex + 7]   // PM2.5 표준
-        _pmsData[2] = (available[startIndex + 8] << 8) | available[startIndex + 9]   // PM10 표준
-        _pmsData[3] = (available[startIndex + 10] << 8) | available[startIndex + 11] // PM1.0 대기
-        _pmsData[4] = (available[startIndex + 12] << 8) | available[startIndex + 13] // PM2.5 대기
-        _pmsData[5] = (available[startIndex + 14] << 8) | available[startIndex + 15] // PM10 대기
-
-        _pmsReady = true
-    }
-
-
-    /********** MHZ19 이산화탄소 센서 **********/
-
-    // MHZ19는 NDIR(비분산 적외선) 방식의 CO2 센서입니다.
-    // 측정 범위: 0-2000ppm, 0-5000ppm, 0-10000ppm
-
-    // MHZ19 시리얼 포트 타입
-    export enum MHZ19Serial {
-        //% block="software serial"
-        Software = 0,
-        //% block="hardware serial"
-        Hardware = 1
-    }
-
-    // MHZ19 데이터 타입
-    export enum MHZ19DataType {
-        //% block="CO2(ppm)"
-        CO2 = 0,
-        //% block="temperature(°C)"
-        Temperature = 1
-    }
-
-    // MHZ19 측정 범위
-    export enum MHZ19Range {
-        //% block="2000 ppm"
-        Range2000 = 2000,
-        //% block="5000 ppm"
-        Range5000 = 5000,
-        //% block="10000 ppm"
-        Range10000 = 10000
-    }
-
-    // MHZ19 필터 모드
-    export enum MHZ19Filter {
-        //% block="on"
-        On = 1,
-        //% block="off"
-        Off = 0
-    }
-
-    // MHZ19 필터 타입
-    export enum MHZ19FilterType {
-        //% block="clear"
-        Clear = 0,
-        //% block="kalman"
-        Kalman = 1
-    }
-
-    // MHZ19 자동 보정
-    export enum MHZ19AutoCal {
-        //% block="auto cal on"
-        On = 1,
-        //% block="auto cal off"
-        Off = 0
-    }
-
-    // MHZ19 상태 타입
-    export enum MHZ19Status {
-        //% block="range"
-        Range = 0,
-        //% block="auto cal"
-        AutoCal = 1
-    }
-
-    // MHZ19 상태 변수
-    let _mhz19Tx: SerialPin = SerialPin.P1
-    let _mhz19Rx: SerialPin = SerialPin.P2
-    let _mhz19CO2: number = 0
-    let _mhz19Temp: number = 0
-    let _mhz19Range: number = 2000
-    let _mhz19AutoCal: boolean = true
-
-    //% block="MHZ19 CO2 sensor setup: serial %serialType, RX %rx, TX %tx, baud %baud"
-    //% serialType.defl=MHZ19Serial.Software
-    //% rx.defl=SerialPin.P2
-    //% tx.defl=SerialPin.P1
-    //% baud.defl=9600
-    //% group="CO2센서(MHZ19)" weight=175
-    //% inlineInputMode=inline
-    export function mhz19Init(serialType: MHZ19Serial, rx: SerialPin, tx: SerialPin, baud: number): void {
-        _mhz19Rx = rx
-        _mhz19Tx = tx
-        serial.redirect(tx, rx, baud)
-        basic.pause(500)  // 센서 안정화 대기
-    }
-
-    //% block="MHZ19 set range: %range ppm"
-    //% range.defl=MHZ19Range.Range2000
-    //% group="CO2센서(MHZ19)" weight=174
-    export function mhz19SetRange(range: MHZ19Range): void {
-        _mhz19Range = range
-        // 범위 설정 명령: FF 01 99 00 00 00 [범위H] [범위L] [체크섬]
-        let cmd = pins.createBuffer(9)
-        cmd[0] = 0xFF
-        cmd[1] = 0x01
-        cmd[2] = 0x99
-        cmd[3] = 0x00
-        cmd[4] = 0x00
-        cmd[5] = 0x00
-        cmd[6] = (range >> 8) & 0xFF
-        cmd[7] = range & 0xFF
-        cmd[8] = mhz19Checksum(cmd)
-        serial.writeBuffer(cmd)
-        basic.pause(100)
-    }
-
-    //% block="MHZ19 filter mode %filter, type %filterType"
-    //% filter.defl=MHZ19Filter.On
-    //% filterType.defl=MHZ19FilterType.Clear
-    //% group="CO2센서(MHZ19)" weight=173
-    //% inlineInputMode=inline
-    export function mhz19SetFilter(filter: MHZ19Filter, filterType: MHZ19FilterType): void {
-        // 필터 설정은 소프트웨어적으로 처리 (MHZ19B에서는 직접 지원 안함)
-        // 이 블록은 호환성을 위해 제공
-    }
-
-    //% block="MHZ19 read: %dtype"
-    //% dtype.defl=MHZ19DataType.CO2
-    //% group="CO2센서(MHZ19)" weight=172
-    export function mhz19Read(dtype: MHZ19DataType): number {
-        // CO2 읽기 명령: FF 01 86 00 00 00 00 00 79
-        let cmd = pins.createBuffer(9)
-        cmd[0] = 0xFF
-        cmd[1] = 0x01
-        cmd[2] = 0x86
-        cmd[3] = 0x00
-        cmd[4] = 0x00
-        cmd[5] = 0x00
-        cmd[6] = 0x00
-        cmd[7] = 0x00
-        cmd[8] = 0x79
-        serial.writeBuffer(cmd)
-
-        basic.pause(100)
-
-        // 응답 읽기 (9바이트)
-        let response = serial.readBuffer(9)
-        if (response.length >= 9 && response[0] == 0xFF && response[1] == 0x86) {
-            // 체크섬 확인
-            let checksum = mhz19Checksum(response)
-            if (checksum == response[8]) {
-                _mhz19CO2 = (response[2] << 8) | response[3]
-                _mhz19Temp = response[4] - 40  // 온도는 40을 빼야 함
-            }
-        }
-
-        if (dtype == MHZ19DataType.CO2) {
-            return _mhz19CO2
-        }
-        return _mhz19Temp
-    }
-
-    //% block="MHZ19 %autoCal period(hour): %hours"
-    //% autoCal.defl=MHZ19AutoCal.On
-    //% hours.defl=24 hours.min=0 hours.max=720
-    //% group="CO2센서(MHZ19)" weight=171
-    //% inlineInputMode=inline
-    export function mhz19SetAutoCal(autoCal: MHZ19AutoCal, hours: number): void {
-        _mhz19AutoCal = (autoCal == MHZ19AutoCal.On)
-        // 자동 보정 ON: FF 01 79 A0 00 00 00 00 E6
-        // 자동 보정 OFF: FF 01 79 00 00 00 00 00 86
-        let cmd = pins.createBuffer(9)
-        cmd[0] = 0xFF
-        cmd[1] = 0x01
-        cmd[2] = 0x79
-        cmd[3] = _mhz19AutoCal ? 0xA0 : 0x00
-        cmd[4] = 0x00
-        cmd[5] = 0x00
-        cmd[6] = 0x00
-        cmd[7] = 0x00
-        cmd[8] = mhz19Checksum(cmd)
-        serial.writeBuffer(cmd)
-        basic.pause(100)
-    }
-
-    //% block="MHZ19 status read: %status"
-    //% status.defl=MHZ19Status.Range
-    //% group="CO2센서(MHZ19)" weight=170
-    export function mhz19GetStatus(status: MHZ19Status): number {
-        if (status == MHZ19Status.Range) {
-            return _mhz19Range
-        }
-        return _mhz19AutoCal ? 1 : 0
-    }
-
-    // MHZ19 체크섬 계산 (내부 함수)
-    function mhz19Checksum(buf: Buffer): number {
-        let sum = 0
-        for (let i = 1; i < 8; i++) {
-            sum += buf[i]
-        }
-        return (0xFF - (sum & 0xFF) + 1) & 0xFF
     }
 
 
@@ -1275,422 +654,481 @@ namespace Sensors03 {
     }
 
 
-    /********** 서미스터 온도 센서 (NTC Thermistor) **********/
+    /********** PMS 미세먼지 센서 (PMS5003, PMS7003 등) **********/
 
-    // NTC 서미스터는 온도에 따라 저항이 변하는 센서입니다.
-    // Steinhart-Hart 방정식 또는 Beta 파라미터 방정식을 사용하여 온도를 계산합니다.
+    // PMS-X003 시리즈는 레이저 산란 방식의 미세먼지 센서입니다.
+    // PM1.0, PM2.5, PM10 농도를 측정합니다.
 
-    // 서미스터 상태 변수
-    let _thermistorPin: AnalogPin = AnalogPin.P0
-    let _thermistorNominal: number = 10000      // 공칭 저항 (25°C에서의 저항값)
-    let _thermistorBeta: number = 3950          // 베타 계수
-    let _thermistorSeriesR: number = 10000      // 직렬 저항값
-
-    /**
-     * 서미스터 온도 센서 설정
-     * @param pin 아날로그 핀
-     * @param nominalR 공칭 저항 (25°C에서의 저항, 보통 10000Ω)
-     * @param beta 베타 계수 (보통 3950)
-     * @param seriesR 직렬 저항 (보통 10000Ω)
-     */
-    //% block="서미스터 온도 센서: 아날로그 핀 $pin , 공칭 저항 $nominalR Ω, 베타 계수 $beta , 직렬 저항 $seriesR Ω 설정"
-    //% pin.defl=AnalogPin.P0
-    //% nominalR.defl=10000
-    //% beta.defl=3950
-    //% seriesR.defl=10000
-    //% group="서미스터(NTC)" weight=189
-    //% inlineInputMode=inline
-    export function thermistorInit(pin: AnalogPin, nominalR: number, beta: number, seriesR: number): void {
-        _thermistorPin = pin
-        _thermistorNominal = nominalR
-        _thermistorBeta = beta
-        _thermistorSeriesR = seriesR
-    }
-
-    /**
-     * 서미스터 온도 센서 온도 측정
-     * @param unit 온도 단위
-     * @returns 온도 값
-     */
-    //% block="서미스터 온도 센서 온도 측정 ( $unit )"
-    //% unit.defl=TempUnit.Celsius
-    //% group="서미스터(NTC)" weight=188
-    export function thermistorReadTemp(unit: TempUnit): number {
-        let adcValue = pins.analogReadPin(_thermistorPin)
-        
-        // ADC 값으로부터 저항 계산
-        // 회로: Vcc -- [직렬저항] -- [ADC] -- [서미스터] -- GND
-        let resistance = _thermistorSeriesR * adcValue / (1023 - adcValue)
-        
-        // Steinhart-Hart Beta 파라미터 방정식
-        // 1/T = 1/T0 + (1/B) * ln(R/R0)
-        // T0 = 298.15K (25°C), R0 = 공칭 저항
-        let steinhart = Math.log(resistance / _thermistorNominal)
-        steinhart = steinhart / _thermistorBeta
-        steinhart = steinhart + (1.0 / 298.15)
-        let tempK = 1.0 / steinhart
-        let tempC = tempK - 273.15
-        
-        if (unit == TempUnit.Fahrenheit) {
-            return tempC * 9 / 5 + 32
-        }
-        return tempC
-    }
-
-    /**
-     * 서미스터 온도 센서 원본 값 (ADC 값)
-     * @returns ADC 원본 값 (0~1023)
-     */
-    //% block="서미스터 온도 센서 원본 값"
-    //% group="서미스터(NTC)" weight=187
-    export function thermistorReadRaw(): number {
-        return pins.analogReadPin(_thermistorPin)
-    }
-
-    /**
-     * 서미스터 온도 센서 저항 값
-     * @returns 계산된 저항 값 (Ω)
-     */
-    //% block="서미스터 온도 센서 저항 값"
-    //% group="서미스터(NTC)" weight=186
-    export function thermistorReadResistance(): number {
-        let adcValue = pins.analogReadPin(_thermistorPin)
-        if (adcValue >= 1023) return 0
-        if (adcValue <= 0) return 999999
-        
-        // 저항 계산
-        let resistance = _thermistorSeriesR * adcValue / (1023 - adcValue)
-        return Math.round(resistance)
-    }
-
-
-    /********** 지문 센서 (AS608/R307/FPM10A) **********/
-
-    // 지문 센서는 시리얼 통신으로 동작합니다.
-    // AS608, R307, FPM10A 등 호환 센서 지원
-
-    // 시리얼 타입
-    export enum FingerprintSerial {
-        //% block="소프트웨어 시리얼"
+    // PMS 시리얼 포트 타입
+    export enum PMSSerial {
+        //% block="SoftwareSerial"
         Software = 0,
-        //% block="하드웨어 시리얼"
+        //% block="HardwareSerial"
         Hardware = 1
     }
 
-    // 지문 등록 과정
-    export enum FingerprintEnrollStep {
-        //% block="이미지 가져오기"
-        GetImage = 1,
-        //% block="이미지 변환"
-        Image2Tz = 2,
-        //% block="모델 생성"
-        CreateModel = 3,
-        //% block="저장"
-        Store = 4
+    // PMS 데이터 타입
+    export enum PMSDataType {
+        //% block="PM1.0 (std)"
+        PM1_0_STD = 0,
+        //% block="PM2.5 (std)"
+        PM2_5_STD = 1,
+        //% block="PM10 (std)"
+        PM10_STD = 2,
+        //% block="PM1.0 (atm)"
+        PM1_0_ATM = 3,
+        //% block="PM2.5 (atm)"
+        PM2_5_ATM = 4,
+        //% block="PM10 (atm)"
+        PM10_ATM = 5
     }
 
-    // 지문 인식 모드
-    export enum FingerprintSearchMode {
-        //% block="빠른"
-        Fast = 0,
-        //% block="정확한"
-        Accurate = 1
+    // PMS 모드
+    export enum PMSMode {
+        //% block="active"
+        Active = 0,
+        //% block="passive"
+        Passive = 1
     }
 
-    // 지문 인식 결과 타입
-    export enum FingerprintResult {
-        //% block="지문 ID"
-        FingerID = 0,
-        //% block="일치 점수"
-        Confidence = 1,
-        //% block="상태 코드"
-        StatusCode = 2
+    // PMS 전원 상태
+    export enum PMSPower {
+        //% block="wakeup"
+        Wakeup = 0,
+        //% block="sleep"
+        Sleep = 1
     }
 
-    // 지문 데이터베이스 동작
-    export enum FingerprintDBAction {
-        //% block="ID 삭제"
-        Delete = 0,
-        //% block="전체 삭제"
-        Empty = 1,
-        //% block="개수 확인"
-        Count = 2
+    // PMS 상태 변수
+    let _pmsTx: SerialPin = SerialPin.P1
+    let _pmsRx: SerialPin = SerialPin.P2
+    let _pmsData: number[] = [0, 0, 0, 0, 0, 0]  // PM1.0_STD, PM2.5_STD, PM10_STD, PM1.0_ATM, PM2.5_ATM, PM10_ATM
+    let _pmsReady: boolean = false
+    let _pmsBuffer: number[] = []
+
+    //% block="PM sensor(PMS-X003): serial %serialType, RX %rx, TX %tx, baud %baud setup"
+    //% serialType.defl=PMSSerial.Software
+    //% rx.defl=SerialPin.P2
+    //% tx.defl=SerialPin.P1
+    //% baud.defl=9600
+    //% group="미세먼지(PMS)" weight=185
+    //% inlineInputMode=inline
+    export function pmsInit(serialType: PMSSerial, rx: SerialPin, tx: SerialPin, baud: number): void {
+        _pmsRx = rx
+        _pmsTx = tx
+        serial.redirect(tx, rx, baud)
+        _pmsReady = false
+        _pmsBuffer = []
+        basic.pause(1000)  // 센서 안정화 대기
     }
 
-    // LED 제어
-    export enum FingerprintLED {
-        //% block="켜기"
+    //% block="PMS PM sensor power %power"
+    //% power.defl=PMSPower.Wakeup
+    //% group="미세먼지(PMS)" weight=184
+    export function pmsPower(power: PMSPower): void {
+        if (power == PMSPower.Sleep) {
+            // 슬립 명령: 42 4D E4 00 00 01 73
+            let cmd = pins.createBuffer(7)
+            cmd[0] = 0x42
+            cmd[1] = 0x4D
+            cmd[2] = 0xE4
+            cmd[3] = 0x00
+            cmd[4] = 0x00
+            cmd[5] = 0x01
+            cmd[6] = 0x73
+            serial.writeBuffer(cmd)
+        } else {
+            // 깨우기 명령: 42 4D E4 00 01 01 74
+            let cmd = pins.createBuffer(7)
+            cmd[0] = 0x42
+            cmd[1] = 0x4D
+            cmd[2] = 0xE4
+            cmd[3] = 0x00
+            cmd[4] = 0x01
+            cmd[5] = 0x01
+            cmd[6] = 0x74
+            serial.writeBuffer(cmd)
+            basic.pause(1000)  // 깨우기 후 안정화
+        }
+    }
+
+    //% block="PMS PM sensor mode %mode"
+    //% mode.defl=PMSMode.Active
+    //% group="미세먼지(PMS)" weight=183
+    export function pmsSetMode(mode: PMSMode): void {
+        if (mode == PMSMode.Passive) {
+            // 패시브 모드: 42 4D E1 00 00 01 70
+            let cmd = pins.createBuffer(7)
+            cmd[0] = 0x42
+            cmd[1] = 0x4D
+            cmd[2] = 0xE1
+            cmd[3] = 0x00
+            cmd[4] = 0x00
+            cmd[5] = 0x01
+            cmd[6] = 0x70
+            serial.writeBuffer(cmd)
+        } else {
+            // 활성 모드: 42 4D E1 00 01 01 71
+            let cmd = pins.createBuffer(7)
+            cmd[0] = 0x42
+            cmd[1] = 0x4D
+            cmd[2] = 0xE1
+            cmd[3] = 0x00
+            cmd[4] = 0x01
+            cmd[5] = 0x01
+            cmd[6] = 0x71
+            serial.writeBuffer(cmd)
+        }
+    }
+
+    //% block="PMS PM sensor read %dtype"
+    //% dtype.defl=PMSDataType.PM2_5_STD
+    //% group="미세먼지(PMS)" weight=182
+    export function pmsRead(dtype: PMSDataType): number {
+        pmsParseData()
+        return _pmsData[dtype]
+    }
+
+    //% block="PMS PM sensor request read"
+    //% group="미세먼지(PMS)" weight=181
+    export function pmsRequestRead(): void {
+        // 수동 읽기 요청: 42 4D E2 00 00 01 71
+        let cmd = pins.createBuffer(7)
+        cmd[0] = 0x42
+        cmd[1] = 0x4D
+        cmd[2] = 0xE2
+        cmd[3] = 0x00
+        cmd[4] = 0x00
+        cmd[5] = 0x01
+        cmd[6] = 0x71
+        serial.writeBuffer(cmd)
+    }
+
+    //% block="PMS PM sensor data ready"
+    //% group="미세먼지(PMS)" weight=180
+    export function pmsDataReady(): boolean {
+        pmsParseData()
+        return _pmsReady
+    }
+
+    // PMS 데이터 파싱 (내부 함수)
+    function pmsParseData(): void {
+        _pmsReady = false
+
+        // 시리얼 버퍼에서 데이터 읽기
+        let available = serial.readBuffer(32)
+        if (available.length < 32) return
+
+        // 시작 바이트 찾기 (0x42 0x4D)
+        let startIndex = -1
+        for (let i = 0; i < available.length - 1; i++) {
+            if (available[i] == 0x42 && available[i + 1] == 0x4D) {
+                startIndex = i
+                break
+            }
+        }
+
+        if (startIndex < 0 || startIndex + 32 > available.length) return
+
+        // 프레임 길이 확인
+        let frameLen = (available[startIndex + 2] << 8) | available[startIndex + 3]
+        if (frameLen != 28) return
+
+        // 체크섬 계산
+        let checksum = 0
+        for (let i = 0; i < 30; i++) {
+            checksum += available[startIndex + i]
+        }
+        let receivedChecksum = (available[startIndex + 30] << 8) | available[startIndex + 31]
+
+        if (checksum != receivedChecksum) return
+
+        // 데이터 추출
+        _pmsData[0] = (available[startIndex + 4] << 8) | available[startIndex + 5]   // PM1.0 표준
+        _pmsData[1] = (available[startIndex + 6] << 8) | available[startIndex + 7]   // PM2.5 표준
+        _pmsData[2] = (available[startIndex + 8] << 8) | available[startIndex + 9]   // PM10 표준
+        _pmsData[3] = (available[startIndex + 10] << 8) | available[startIndex + 11] // PM1.0 대기
+        _pmsData[4] = (available[startIndex + 12] << 8) | available[startIndex + 13] // PM2.5 대기
+        _pmsData[5] = (available[startIndex + 14] << 8) | available[startIndex + 15] // PM10 대기
+
+        _pmsReady = true
+    }
+
+
+    /********** 로터리 엔코더 **********/
+
+    // 로터리 엔코더 (KY-040 등)
+    // 회전 방향 감지, 누적 카운터 지원
+
+    // 회전 방향
+    export enum RotaryDir {
+        //% block="stop"
+        None = 0,
+        //% block="clockwise"
+        CW = 1,
+        //% block="counter-clockwise"
+        CCW = -1
+    }
+
+    // 로터리 엔코더 상태 변수
+    let _rotaryDT: DigitalPin = DigitalPin.P2
+    let _rotaryCLK: DigitalPin = DigitalPin.P3
+    let _rotaryCounter: number = 0
+    let _rotaryLastCLK: number = 0
+    let _rotaryDirection: RotaryDir = RotaryDir.None
+
+    //% block="rotary encoder: DT pin %dt|CLK pin %clk|set"
+    //% dt.defl=DigitalPin.P2
+    //% clk.defl=DigitalPin.P3
+    //% group="Rotary Encoder" weight=195
+    //% inlineInputMode=inline
+    export function rotaryInit(dt: DigitalPin, clk: DigitalPin): void {
+        _rotaryDT = dt
+        _rotaryCLK = clk
+        _rotaryCounter = 0
+        _rotaryLastCLK = pins.digitalReadPin(clk)
+        _rotaryDirection = RotaryDir.None
+    }
+
+    //% block="rotary encoder rotate value"
+    //% group="Rotary Encoder" weight=194
+    export function rotaryRead(): number {
+        let currentCLK = pins.digitalReadPin(_rotaryCLK)
+        let change = 0
+
+        // CLK이 변했을 때만 감지
+        if (currentCLK != _rotaryLastCLK && currentCLK == 0) {
+            // DT 값으로 방향 판단
+            if (pins.digitalReadPin(_rotaryDT) != currentCLK) {
+                _rotaryCounter++
+                _rotaryDirection = RotaryDir.CW
+                change = 1
+            } else {
+                _rotaryCounter--
+                _rotaryDirection = RotaryDir.CCW
+                change = -1
+            }
+        }
+
+        _rotaryLastCLK = currentCLK
+        return change
+    }
+
+    //% block="rotary encoder rotate direction"
+    //% group="Rotary Encoder" weight=193
+    export function rotaryDirection(): RotaryDir {
+        rotaryRead()  // 상태 업데이트
+        let dir = _rotaryDirection
+        _rotaryDirection = RotaryDir.None  // 읽은 후 리셋
+        return dir
+    }
+
+    //% block="rotary encoder counter"
+    //% group="Rotary Encoder" weight=192
+    export function rotaryCounter(): number {
+        rotaryRead()  // 상태 업데이트
+        return _rotaryCounter
+    }
+
+    //% block="rotary encoder counter reset"
+    //% group="Rotary Encoder" weight=191
+    export function rotaryReset(): void {
+        _rotaryCounter = 0
+        _rotaryDirection = RotaryDir.None
+    }
+
+
+    /********** MHZ19 이산화탄소 센서 **********/
+
+    // MHZ19는 NDIR(비분산 적외선) 방식의 CO2 센서입니다.
+    // 측정 범위: 0-2000ppm, 0-5000ppm, 0-10000ppm
+
+    // MHZ19 시리얼 포트 타입
+    export enum MHZ19Serial {
+        //% block="software serial"
+        Software = 0,
+        //% block="hardware serial"
+        Hardware = 1
+    }
+
+    // MHZ19 데이터 타입
+    export enum MHZ19DataType {
+        //% block="CO2(ppm)"
+        CO2 = 0,
+        //% block="temperature(°C)"
+        Temperature = 1
+    }
+
+    // MHZ19 측정 범위
+    export enum MHZ19Range {
+        //% block="2000 ppm"
+        Range2000 = 2000,
+        //% block="5000 ppm"
+        Range5000 = 5000,
+        //% block="10000 ppm"
+        Range10000 = 10000
+    }
+
+    // MHZ19 필터 모드
+    export enum MHZ19Filter {
+        //% block="on"
         On = 1,
-        //% block="끄기"
+        //% block="off"
         Off = 0
     }
 
-    // 지문 센서 상태 변수
-    let _fpSerialType: FingerprintSerial = FingerprintSerial.Software
-    let _fpRxPin: SerialPin = SerialPin.P2
-    let _fpTxPin: SerialPin = SerialPin.P8
-    let _fpBaudRate: BaudRate = BaudRate.BaudRate57600
-    let _fpFingerID: number = -1
-    let _fpConfidence: number = 0
-    let _fpStatusCode: number = 0
-    let _fpInitialized: boolean = false
+    // MHZ19 필터 타입
+    export enum MHZ19FilterType {
+        //% block="clear"
+        Clear = 0,
+        //% block="kalman"
+        Kalman = 1
+    }
 
-    // 지문 센서 패킷 상수
-    const FP_HEADER = 0xEF01
-    const FP_ADDRESS = 0xFFFFFFFF
-    const FP_CMD_PACKET = 0x01
-    const FP_DATA_PACKET = 0x02
-    const FP_ACK_PACKET = 0x07
-    const FP_END_PACKET = 0x08
+    // MHZ19 자동 보정
+    export enum MHZ19AutoCal {
+        //% block="auto cal on"
+        On = 1,
+        //% block="auto cal off"
+        Off = 0
+    }
 
-    /**
-     * 지문 센서 설정
-     * @param serialType 시리얼 타입
-     * @param rx RX 핀
-     * @param tx TX 핀
-     * @param baudRate 통신 속도
-     */
-    //% block="지문 센서 설정: 시리얼 $serialType , RX핀 $rx , TX핀 $tx , 통신 속도 $baudRate"
-    //% serialType.defl=FingerprintSerial.Software
+    // MHZ19 상태 타입
+    export enum MHZ19Status {
+        //% block="range"
+        Range = 0,
+        //% block="auto cal"
+        AutoCal = 1
+    }
+
+    // MHZ19 상태 변수
+    let _mhz19Tx: SerialPin = SerialPin.P1
+    let _mhz19Rx: SerialPin = SerialPin.P2
+    let _mhz19CO2: number = 0
+    let _mhz19Temp: number = 0
+    let _mhz19Range: number = 2000
+    let _mhz19AutoCal: boolean = true
+
+    //% block="MHZ19 CO2 sensor setup: serial %serialType, RX %rx, TX %tx, baud %baud"
+    //% serialType.defl=MHZ19Serial.Software
     //% rx.defl=SerialPin.P2
-    //% tx.defl=SerialPin.P8
-    //% baudRate.defl=57600
-    //% group="지문센서" weight=185
+    //% tx.defl=SerialPin.P1
+    //% baud.defl=9600
+    //% group="CO2센서(MHZ19)" weight=175
     //% inlineInputMode=inline
-    export function fingerprintInit(serialType: FingerprintSerial, rx: SerialPin, tx: SerialPin, baudRate: number): void {
-        _fpSerialType = serialType
-        _fpRxPin = rx
-        _fpTxPin = tx
-        
-        // BaudRate 변환
-        if (baudRate == 9600) _fpBaudRate = BaudRate.BaudRate9600
-        else if (baudRate == 19200) _fpBaudRate = BaudRate.BaudRate19200
-        else if (baudRate == 38400) _fpBaudRate = BaudRate.BaudRate38400
-        else if (baudRate == 57600) _fpBaudRate = BaudRate.BaudRate57600
-        else if (baudRate == 115200) _fpBaudRate = BaudRate.BaudRate115200
-        else _fpBaudRate = BaudRate.BaudRate57600
-        
-        serial.redirect(tx, rx, _fpBaudRate)
+    export function mhz19Init(serialType: MHZ19Serial, rx: SerialPin, tx: SerialPin, baud: number): void {
+        _mhz19Rx = rx
+        _mhz19Tx = tx
+        serial.redirect(tx, rx, baud)
+        basic.pause(500)  // 센서 안정화 대기
+    }
+
+    //% block="MHZ19 set range: %range ppm"
+    //% range.defl=MHZ19Range.Range2000
+    //% group="CO2센서(MHZ19)" weight=174
+    export function mhz19SetRange(range: MHZ19Range): void {
+        _mhz19Range = range
+        // 범위 설정 명령: FF 01 99 00 00 00 [범위H] [범위L] [체크섬]
+        let cmd = pins.createBuffer(9)
+        cmd[0] = 0xFF
+        cmd[1] = 0x01
+        cmd[2] = 0x99
+        cmd[3] = 0x00
+        cmd[4] = 0x00
+        cmd[5] = 0x00
+        cmd[6] = (range >> 8) & 0xFF
+        cmd[7] = range & 0xFF
+        cmd[8] = mhz19Checksum(cmd)
+        serial.writeBuffer(cmd)
         basic.pause(100)
-        _fpInitialized = true
     }
 
-    /**
-     * 지문 등록 과정
-     * @param step 등록 단계
-     * @param id 지문 ID (1~127)
-     * @returns 성공 여부
-     */
-    //% block="지문 등록 과정 $step , ID 번호: $id"
-    //% step.defl=FingerprintEnrollStep.GetImage
-    //% id.min=1 id.max=127 id.defl=1
-    //% group="지문센서" weight=184
-    export function fingerprintEnroll(step: FingerprintEnrollStep, id: number): boolean {
-        let cmd: number[] = []
-        
-        switch (step) {
-            case FingerprintEnrollStep.GetImage:
-                // 이미지 가져오기 (0x01)
-                cmd = [0x01]
-                break
-            case FingerprintEnrollStep.Image2Tz:
-                // 이미지 변환 (0x02), 버퍼 1 또는 2
-                cmd = [0x02, 0x01]
-                break
-            case FingerprintEnrollStep.CreateModel:
-                // 모델 생성 (0x05)
-                cmd = [0x05]
-                break
-            case FingerprintEnrollStep.Store:
-                // 저장 (0x06), 버퍼 1, ID
-                cmd = [0x06, 0x01, (id >> 8) & 0xFF, id & 0xFF]
-                break
-        }
-        
-        _fpStatusCode = fpSendCommand(cmd)
-        return _fpStatusCode == 0x00
+    //% block="MHZ19 filter mode %filter, type %filterType"
+    //% filter.defl=MHZ19Filter.On
+    //% filterType.defl=MHZ19FilterType.Clear
+    //% group="CO2센서(MHZ19)" weight=173
+    //% inlineInputMode=inline
+    export function mhz19SetFilter(filter: MHZ19Filter, filterType: MHZ19FilterType): void {
+        // 필터 설정은 소프트웨어적으로 처리 (MHZ19B에서는 직접 지원 안함)
+        // 이 블록은 호환성을 위해 제공
     }
 
-    /**
-     * 지문 인식 모드 검색
-     * @param mode 검색 모드
-     * @returns 성공 여부
-     */
-    //% block="지문 인식 모드: $mode 검색"
-    //% mode.defl=FingerprintSearchMode.Fast
-    //% group="지문센서" weight=183
-    export function fingerprintSearch(mode: FingerprintSearchMode): boolean {
-        // 1. 이미지 가져오기
-        _fpStatusCode = fpSendCommand([0x01])
-        if (_fpStatusCode != 0x00) {
-            _fpFingerID = -1
-            _fpConfidence = 0
-            return false
-        }
-        
-        // 2. 이미지 변환
-        _fpStatusCode = fpSendCommand([0x02, 0x01])
-        if (_fpStatusCode != 0x00) {
-            _fpFingerID = -1
-            _fpConfidence = 0
-            return false
-        }
-        
-        // 3. 검색 (0x04), 버퍼1, 시작ID(0), 끝ID(127)
-        let searchCmd = [0x04, 0x01, 0x00, 0x00, 0x00, 0x7F]
-        let response = fpSendCommandWithResponse(searchCmd)
-        
-        if (response.length >= 4 && response[0] == 0x00) {
-            _fpFingerID = (response[1] << 8) | response[2]
-            _fpConfidence = (response[3] << 8) | (response.length > 4 ? response[4] : 0)
-            _fpStatusCode = 0x00
-            return true
-        }
-        
-        _fpFingerID = -1
-        _fpConfidence = 0
-        _fpStatusCode = response.length > 0 ? response[0] : 0xFF
-        return false
-    }
+    //% block="MHZ19 read: %dtype"
+    //% dtype.defl=MHZ19DataType.CO2
+    //% group="CO2센서(MHZ19)" weight=172
+    export function mhz19Read(dtype: MHZ19DataType): number {
+        // CO2 읽기 명령: FF 01 86 00 00 00 00 00 79
+        let cmd = pins.createBuffer(9)
+        cmd[0] = 0xFF
+        cmd[1] = 0x01
+        cmd[2] = 0x86
+        cmd[3] = 0x00
+        cmd[4] = 0x00
+        cmd[5] = 0x00
+        cmd[6] = 0x00
+        cmd[7] = 0x00
+        cmd[8] = 0x79
+        serial.writeBuffer(cmd)
 
-    /**
-     * 지문 인식 결과
-     * @param resultType 결과 타입
-     * @returns 결과 값
-     */
-    //% block="지문 인식 결과: $resultType"
-    //% resultType.defl=FingerprintResult.FingerID
-    //% group="지문센서" weight=182
-    export function fingerprintGetResult(resultType: FingerprintResult): number {
-        switch (resultType) {
-            case FingerprintResult.FingerID:
-                return _fpFingerID
-            case FingerprintResult.Confidence:
-                return _fpConfidence
-            case FingerprintResult.StatusCode:
-                return _fpStatusCode
-            default:
-                return -1
-        }
-    }
+        basic.pause(100)
 
-    /**
-     * 지문 데이터베이스 관리
-     * @param action 동작
-     * @param id ID 번호 (삭제 시 사용)
-     * @returns 결과 값
-     */
-    //% block="지문 데이터베이스 $action , ID: $id"
-    //% action.defl=FingerprintDBAction.Delete
-    //% id.min=1 id.max=127 id.defl=1
-    //% group="지문센서" weight=181
-    export function fingerprintDatabase(action: FingerprintDBAction, id: number): number {
-        let cmd: number[] = []
-        
-        switch (action) {
-            case FingerprintDBAction.Delete:
-                // 삭제 (0x0C), ID, 개수(1)
-                cmd = [0x0C, (id >> 8) & 0xFF, id & 0xFF, 0x00, 0x01]
-                _fpStatusCode = fpSendCommand(cmd)
-                return _fpStatusCode == 0x00 ? 1 : 0
-                
-            case FingerprintDBAction.Empty:
-                // 전체 삭제 (0x0D)
-                cmd = [0x0D]
-                _fpStatusCode = fpSendCommand(cmd)
-                return _fpStatusCode == 0x00 ? 1 : 0
-                
-            case FingerprintDBAction.Count:
-                // 개수 확인 (0x1D)
-                cmd = [0x1D]
-                let response = fpSendCommandWithResponse(cmd)
-                if (response.length >= 3 && response[0] == 0x00) {
-                    return (response[1] << 8) | response[2]
-                }
-                return 0
-        }
-        return 0
-    }
-
-    /**
-     * 지문 센서 LED 제어
-     * @param state LED 상태
-     */
-    //% block="지문 센서 LED 제어 $state"
-    //% state.defl=FingerprintLED.On
-    //% group="지문센서" weight=180
-    export function fingerprintLED(state: FingerprintLED): void {
-        // LED 제어 (0x35 또는 센서별 다름)
-        // 일부 센서는 별도 LED 핀 사용
-        let cmd = [0x35, state == FingerprintLED.On ? 0x01 : 0x00, 0x00, 0x00, 0x00]
-        fpSendCommand(cmd)
-    }
-
-    // 지문 센서 명령 전송 (내부 함수)
-    function fpSendCommand(cmd: number[]): number {
-        let response = fpSendCommandWithResponse(cmd)
-        return response.length > 0 ? response[0] : 0xFF
-    }
-
-    // 지문 센서 명령 전송 및 응답 수신 (내부 함수)
-    function fpSendCommandWithResponse(cmd: number[]): number[] {
-        // 패킷 구성
-        let packet: number[] = []
-        
-        // 헤더 (2바이트)
-        packet.push((FP_HEADER >> 8) & 0xFF)
-        packet.push(FP_HEADER & 0xFF)
-        
-        // 주소 (4바이트)
-        packet.push((FP_ADDRESS >> 24) & 0xFF)
-        packet.push((FP_ADDRESS >> 16) & 0xFF)
-        packet.push((FP_ADDRESS >> 8) & 0xFF)
-        packet.push(FP_ADDRESS & 0xFF)
-        
-        // 패킷 타입
-        packet.push(FP_CMD_PACKET)
-        
-        // 길이 (명령 + 체크섬 2바이트)
-        let length = cmd.length + 2
-        packet.push((length >> 8) & 0xFF)
-        packet.push(length & 0xFF)
-        
-        // 명령 데이터
-        for (let b of cmd) {
-            packet.push(b)
-        }
-        
-        // 체크섬 계산
-        let checksum = FP_CMD_PACKET + ((length >> 8) & 0xFF) + (length & 0xFF)
-        for (let b of cmd) {
-            checksum += b
-        }
-        packet.push((checksum >> 8) & 0xFF)
-        packet.push(checksum & 0xFF)
-        
-        // 패킷 전송
-        let buf = Buffer.fromArray(packet)
-        serial.writeBuffer(buf)
-        
-        // 응답 대기
-        basic.pause(200)
-        
-        // 응답 수신
-        let response: number[] = []
-        let respBuf = serial.readBuffer(32)
-        
-        if (respBuf.length >= 12) {
-            // 헤더 확인
-            if (respBuf[0] == 0xEF && respBuf[1] == 0x01) {
-                let respLen = (respBuf[7] << 8) | respBuf[8]
-                // 데이터 추출 (상태 코드부터)
-                for (let i = 9; i < 9 + respLen - 2 && i < respBuf.length; i++) {
-                    response.push(respBuf[i])
-                }
+        // 응답 읽기 (9바이트)
+        let response = serial.readBuffer(9)
+        if (response.length >= 9 && response[0] == 0xFF && response[1] == 0x86) {
+            // 체크섬 확인
+            let checksum = mhz19Checksum(response)
+            if (checksum == response[8]) {
+                _mhz19CO2 = (response[2] << 8) | response[3]
+                _mhz19Temp = response[4] - 40  // 온도는 40을 빼야 함
             }
         }
-        
-        return response
+
+        if (dtype == MHZ19DataType.CO2) {
+            return _mhz19CO2
+        }
+        return _mhz19Temp
+    }
+
+    //% block="MHZ19 %autoCal period(hour): %hours"
+    //% autoCal.defl=MHZ19AutoCal.On
+    //% hours.defl=24 hours.min=0 hours.max=720
+    //% group="CO2센서(MHZ19)" weight=171
+    //% inlineInputMode=inline
+    export function mhz19SetAutoCal(autoCal: MHZ19AutoCal, hours: number): void {
+        _mhz19AutoCal = (autoCal == MHZ19AutoCal.On)
+        // 자동 보정 ON: FF 01 79 A0 00 00 00 00 E6
+        // 자동 보정 OFF: FF 01 79 00 00 00 00 00 86
+        let cmd = pins.createBuffer(9)
+        cmd[0] = 0xFF
+        cmd[1] = 0x01
+        cmd[2] = 0x79
+        cmd[3] = _mhz19AutoCal ? 0xA0 : 0x00
+        cmd[4] = 0x00
+        cmd[5] = 0x00
+        cmd[6] = 0x00
+        cmd[7] = 0x00
+        cmd[8] = mhz19Checksum(cmd)
+        serial.writeBuffer(cmd)
+        basic.pause(100)
+    }
+
+    //% block="MHZ19 status read: %status"
+    //% status.defl=MHZ19Status.Range
+    //% group="CO2센서(MHZ19)" weight=170
+    export function mhz19GetStatus(status: MHZ19Status): number {
+        if (status == MHZ19Status.Range) {
+            return _mhz19Range
+        }
+        return _mhz19AutoCal ? 1 : 0
+    }
+
+    // MHZ19 체크섬 계산 (내부 함수)
+    function mhz19Checksum(buf: Buffer): number {
+        let sum = 0
+        for (let i = 1; i < 8; i++) {
+            sum += buf[i]
+        }
+        return (0xFF - (sum & 0xFF) + 1) & 0xFF
     }
 
 
@@ -1917,6 +1355,425 @@ namespace Sensors03 {
     }
 
 
+    /********** 지문 센서 (AS608/R307/FPM10A) **********/
+
+    // 지문 센서는 시리얼 통신으로 동작합니다.
+    // AS608, R307, FPM10A 등 호환 센서 지원
+
+    // 시리얼 타입
+    export enum FingerprintSerial {
+        //% block="소프트웨어 시리얼"
+        Software = 0,
+        //% block="하드웨어 시리얼"
+        Hardware = 1
+    }
+
+    // 지문 등록 과정
+    export enum FingerprintEnrollStep {
+        //% block="이미지 가져오기"
+        GetImage = 1,
+        //% block="이미지 변환"
+        Image2Tz = 2,
+        //% block="모델 생성"
+        CreateModel = 3,
+        //% block="저장"
+        Store = 4
+    }
+
+    // 지문 인식 모드
+    export enum FingerprintSearchMode {
+        //% block="빠른"
+        Fast = 0,
+        //% block="정확한"
+        Accurate = 1
+    }
+
+    // 지문 인식 결과 타입
+    export enum FingerprintResult {
+        //% block="지문 ID"
+        FingerID = 0,
+        //% block="일치 점수"
+        Confidence = 1,
+        //% block="상태 코드"
+        StatusCode = 2
+    }
+
+    // 지문 데이터베이스 동작
+    export enum FingerprintDBAction {
+        //% block="ID 삭제"
+        Delete = 0,
+        //% block="전체 삭제"
+        Empty = 1,
+        //% block="개수 확인"
+        Count = 2
+    }
+
+    // LED 제어
+    export enum FingerprintLED {
+        //% block="켜기"
+        On = 1,
+        //% block="끄기"
+        Off = 0
+    }
+
+    // 지문 센서 상태 변수
+    let _fpSerialType: FingerprintSerial = FingerprintSerial.Software
+    let _fpRxPin: SerialPin = SerialPin.P2
+    let _fpTxPin: SerialPin = SerialPin.P8
+    let _fpBaudRate: BaudRate = BaudRate.BaudRate57600
+    let _fpFingerID: number = -1
+    let _fpConfidence: number = 0
+    let _fpStatusCode: number = 0
+    let _fpInitialized: boolean = false
+
+    // 지문 센서 패킷 상수
+    const FP_HEADER = 0xEF01
+    const FP_ADDRESS = 0xFFFFFFFF
+    const FP_CMD_PACKET = 0x01
+    const FP_DATA_PACKET = 0x02
+    const FP_ACK_PACKET = 0x07
+    const FP_END_PACKET = 0x08
+
+    /**
+     * 지문 센서 설정
+     * @param serialType 시리얼 타입
+     * @param rx RX 핀
+     * @param tx TX 핀
+     * @param baudRate 통신 속도
+     */
+    //% block="지문 센서 설정: 시리얼 $serialType , RX핀 $rx , TX핀 $tx , 통신 속도 $baudRate"
+    //% serialType.defl=FingerprintSerial.Software
+    //% rx.defl=SerialPin.P2
+    //% tx.defl=SerialPin.P8
+    //% baudRate.defl=57600
+    //% group="지문센서" weight=185
+    //% inlineInputMode=inline
+    export function fingerprintInit(serialType: FingerprintSerial, rx: SerialPin, tx: SerialPin, baudRate: number): void {
+        _fpSerialType = serialType
+        _fpRxPin = rx
+        _fpTxPin = tx
+
+        // BaudRate 변환
+        if (baudRate == 9600) _fpBaudRate = BaudRate.BaudRate9600
+        else if (baudRate == 19200) _fpBaudRate = BaudRate.BaudRate19200
+        else if (baudRate == 38400) _fpBaudRate = BaudRate.BaudRate38400
+        else if (baudRate == 57600) _fpBaudRate = BaudRate.BaudRate57600
+        else if (baudRate == 115200) _fpBaudRate = BaudRate.BaudRate115200
+        else _fpBaudRate = BaudRate.BaudRate57600
+
+        serial.redirect(tx, rx, _fpBaudRate)
+        basic.pause(100)
+        _fpInitialized = true
+    }
+
+    /**
+     * 지문 등록 과정
+     * @param step 등록 단계
+     * @param id 지문 ID (1~127)
+     * @returns 성공 여부
+     */
+    //% block="지문 등록 과정 $step , ID 번호: $id"
+    //% step.defl=FingerprintEnrollStep.GetImage
+    //% id.min=1 id.max=127 id.defl=1
+    //% group="지문센서" weight=184
+    export function fingerprintEnroll(step: FingerprintEnrollStep, id: number): boolean {
+        let cmd: number[] = []
+
+        switch (step) {
+            case FingerprintEnrollStep.GetImage:
+                // 이미지 가져오기 (0x01)
+                cmd = [0x01]
+                break
+            case FingerprintEnrollStep.Image2Tz:
+                // 이미지 변환 (0x02), 버퍼 1 또는 2
+                cmd = [0x02, 0x01]
+                break
+            case FingerprintEnrollStep.CreateModel:
+                // 모델 생성 (0x05)
+                cmd = [0x05]
+                break
+            case FingerprintEnrollStep.Store:
+                // 저장 (0x06), 버퍼 1, ID
+                cmd = [0x06, 0x01, (id >> 8) & 0xFF, id & 0xFF]
+                break
+        }
+
+        _fpStatusCode = fpSendCommand(cmd)
+        return _fpStatusCode == 0x00
+    }
+
+    /**
+     * 지문 인식 모드 검색
+     * @param mode 검색 모드
+     * @returns 성공 여부
+     */
+    //% block="지문 인식 모드: $mode 검색"
+    //% mode.defl=FingerprintSearchMode.Fast
+    //% group="지문센서" weight=183
+    export function fingerprintSearch(mode: FingerprintSearchMode): boolean {
+        // 1. 이미지 가져오기
+        _fpStatusCode = fpSendCommand([0x01])
+        if (_fpStatusCode != 0x00) {
+            _fpFingerID = -1
+            _fpConfidence = 0
+            return false
+        }
+
+        // 2. 이미지 변환
+        _fpStatusCode = fpSendCommand([0x02, 0x01])
+        if (_fpStatusCode != 0x00) {
+            _fpFingerID = -1
+            _fpConfidence = 0
+            return false
+        }
+
+        // 3. 검색 (0x04), 버퍼1, 시작ID(0), 끝ID(127)
+        let searchCmd = [0x04, 0x01, 0x00, 0x00, 0x00, 0x7F]
+        let response = fpSendCommandWithResponse(searchCmd)
+
+        if (response.length >= 4 && response[0] == 0x00) {
+            _fpFingerID = (response[1] << 8) | response[2]
+            _fpConfidence = (response[3] << 8) | (response.length > 4 ? response[4] : 0)
+            _fpStatusCode = 0x00
+            return true
+        }
+
+        _fpFingerID = -1
+        _fpConfidence = 0
+        _fpStatusCode = response.length > 0 ? response[0] : 0xFF
+        return false
+    }
+
+    /**
+     * 지문 인식 결과
+     * @param resultType 결과 타입
+     * @returns 결과 값
+     */
+    //% block="지문 인식 결과: $resultType"
+    //% resultType.defl=FingerprintResult.FingerID
+    //% group="지문센서" weight=182
+    export function fingerprintGetResult(resultType: FingerprintResult): number {
+        switch (resultType) {
+            case FingerprintResult.FingerID:
+                return _fpFingerID
+            case FingerprintResult.Confidence:
+                return _fpConfidence
+            case FingerprintResult.StatusCode:
+                return _fpStatusCode
+            default:
+                return -1
+        }
+    }
+
+    /**
+     * 지문 데이터베이스 관리
+     * @param action 동작
+     * @param id ID 번호 (삭제 시 사용)
+     * @returns 결과 값
+     */
+    //% block="지문 데이터베이스 $action , ID: $id"
+    //% action.defl=FingerprintDBAction.Delete
+    //% id.min=1 id.max=127 id.defl=1
+    //% group="지문센서" weight=181
+    export function fingerprintDatabase(action: FingerprintDBAction, id: number): number {
+        let cmd: number[] = []
+
+        switch (action) {
+            case FingerprintDBAction.Delete:
+                // 삭제 (0x0C), ID, 개수(1)
+                cmd = [0x0C, (id >> 8) & 0xFF, id & 0xFF, 0x00, 0x01]
+                _fpStatusCode = fpSendCommand(cmd)
+                return _fpStatusCode == 0x00 ? 1 : 0
+
+            case FingerprintDBAction.Empty:
+                // 전체 삭제 (0x0D)
+                cmd = [0x0D]
+                _fpStatusCode = fpSendCommand(cmd)
+                return _fpStatusCode == 0x00 ? 1 : 0
+
+            case FingerprintDBAction.Count:
+                // 개수 확인 (0x1D)
+                cmd = [0x1D]
+                let response = fpSendCommandWithResponse(cmd)
+                if (response.length >= 3 && response[0] == 0x00) {
+                    return (response[1] << 8) | response[2]
+                }
+                return 0
+        }
+        return 0
+    }
+
+    /**
+     * 지문 센서 LED 제어
+     * @param state LED 상태
+     */
+    //% block="지문 센서 LED 제어 $state"
+    //% state.defl=FingerprintLED.On
+    //% group="지문센서" weight=180
+    export function fingerprintLED(state: FingerprintLED): void {
+        // LED 제어 (0x35 또는 센서별 다름)
+        // 일부 센서는 별도 LED 핀 사용
+        let cmd = [0x35, state == FingerprintLED.On ? 0x01 : 0x00, 0x00, 0x00, 0x00]
+        fpSendCommand(cmd)
+    }
+
+    // 지문 센서 명령 전송 (내부 함수)
+    function fpSendCommand(cmd: number[]): number {
+        let response = fpSendCommandWithResponse(cmd)
+        return response.length > 0 ? response[0] : 0xFF
+    }
+
+    // 지문 센서 명령 전송 및 응답 수신 (내부 함수)
+    function fpSendCommandWithResponse(cmd: number[]): number[] {
+        // 패킷 구성
+        let packet: number[] = []
+
+        // 헤더 (2바이트)
+        packet.push((FP_HEADER >> 8) & 0xFF)
+        packet.push(FP_HEADER & 0xFF)
+
+        // 주소 (4바이트)
+        packet.push((FP_ADDRESS >> 24) & 0xFF)
+        packet.push((FP_ADDRESS >> 16) & 0xFF)
+        packet.push((FP_ADDRESS >> 8) & 0xFF)
+        packet.push(FP_ADDRESS & 0xFF)
+
+        // 패킷 타입
+        packet.push(FP_CMD_PACKET)
+
+        // 길이 (명령 + 체크섬 2바이트)
+        let length = cmd.length + 2
+        packet.push((length >> 8) & 0xFF)
+        packet.push(length & 0xFF)
+
+        // 명령 데이터
+        for (let b of cmd) {
+            packet.push(b)
+        }
+
+        // 체크섬 계산
+        let checksum = FP_CMD_PACKET + ((length >> 8) & 0xFF) + (length & 0xFF)
+        for (let b of cmd) {
+            checksum += b
+        }
+        packet.push((checksum >> 8) & 0xFF)
+        packet.push(checksum & 0xFF)
+
+        // 패킷 전송
+        let buf = Buffer.fromArray(packet)
+        serial.writeBuffer(buf)
+
+        // 응답 대기
+        basic.pause(200)
+
+        // 응답 수신
+        let response: number[] = []
+        let respBuf = serial.readBuffer(32)
+
+        if (respBuf.length >= 12) {
+            // 헤더 확인
+            if (respBuf[0] == 0xEF && respBuf[1] == 0x01) {
+                let respLen = (respBuf[7] << 8) | respBuf[8]
+                // 데이터 추출 (상태 코드부터)
+                for (let i = 9; i < 9 + respLen - 2 && i < respBuf.length; i++) {
+                    response.push(respBuf[i])
+                }
+            }
+        }
+
+        return response
+    }
+
+
+    /********** 서미스터 온도 센서 (NTC Thermistor) **********/
+
+    // NTC 서미스터는 온도에 따라 저항이 변하는 센서입니다.
+    // Steinhart-Hart 방정식 또는 Beta 파라미터 방정식을 사용하여 온도를 계산합니다.
+
+    // 서미스터 상태 변수
+    let _thermistorPin: AnalogPin = AnalogPin.P0
+    let _thermistorNominal: number = 10000      // 공칭 저항 (25°C에서의 저항값)
+    let _thermistorBeta: number = 3950          // 베타 계수
+    let _thermistorSeriesR: number = 10000      // 직렬 저항값
+
+    /**
+     * 서미스터 온도 센서 설정
+     * @param pin 아날로그 핀
+     * @param nominalR 공칭 저항 (25°C에서의 저항, 보통 10000Ω)
+     * @param beta 베타 계수 (보통 3950)
+     * @param seriesR 직렬 저항 (보통 10000Ω)
+     */
+    //% block="서미스터 온도 센서: 아날로그 핀 $pin , 공칭 저항 $nominalR Ω, 베타 계수 $beta , 직렬 저항 $seriesR Ω 설정"
+    //% pin.defl=AnalogPin.P0
+    //% nominalR.defl=10000
+    //% beta.defl=3950
+    //% seriesR.defl=10000
+    //% group="서미스터(NTC)" weight=189
+    //% inlineInputMode=inline
+    export function thermistorInit(pin: AnalogPin, nominalR: number, beta: number, seriesR: number): void {
+        _thermistorPin = pin
+        _thermistorNominal = nominalR
+        _thermistorBeta = beta
+        _thermistorSeriesR = seriesR
+    }
+
+    /**
+     * 서미스터 온도 센서 온도 측정
+     * @param unit 온도 단위
+     * @returns 온도 값
+     */
+    //% block="서미스터 온도 센서 온도 측정 ( $unit )"
+    //% unit.defl=TempUnit.Celsius
+    //% group="서미스터(NTC)" weight=188
+    export function thermistorReadTemp(unit: TempUnit): number {
+        let adcValue = pins.analogReadPin(_thermistorPin)
+
+        // ADC 값으로부터 저항 계산
+        // 회로: Vcc -- [직렬저항] -- [ADC] -- [서미스터] -- GND
+        let resistance = _thermistorSeriesR * adcValue / (1023 - adcValue)
+
+        // Steinhart-Hart Beta 파라미터 방정식
+        // 1/T = 1/T0 + (1/B) * ln(R/R0)
+        // T0 = 298.15K (25°C), R0 = 공칭 저항
+        let steinhart = Math.log(resistance / _thermistorNominal)
+        steinhart = steinhart / _thermistorBeta
+        steinhart = steinhart + (1.0 / 298.15)
+        let tempK = 1.0 / steinhart
+        let tempC = tempK - 273.15
+
+        if (unit == TempUnit.Fahrenheit) {
+            return tempC * 9 / 5 + 32
+        }
+        return tempC
+    }
+
+    /**
+     * 서미스터 온도 센서 원본 값 (ADC 값)
+     * @returns ADC 원본 값 (0~1023)
+     */
+    //% block="서미스터 온도 센서 원본 값"
+    //% group="서미스터(NTC)" weight=187
+    export function thermistorReadRaw(): number {
+        return pins.analogReadPin(_thermistorPin)
+    }
+
+    /**
+     * 서미스터 온도 센서 저항 값
+     * @returns 계산된 저항 값 (Ω)
+     */
+    //% block="서미스터 온도 센서 저항 값"
+    //% group="서미스터(NTC)" weight=186
+    export function thermistorReadResistance(): number {
+        let adcValue = pins.analogReadPin(_thermistorPin)
+        if (adcValue >= 1023) return 0
+        if (adcValue <= 0) return 999999
+
+        // 저항 계산
+        let resistance = _thermistorSeriesR * adcValue / (1023 - adcValue)
+        return Math.round(resistance)
+    }
+
+
     /********** 탁도 센서 (Turbidity Sensor) **********/
 
     // 탁도 센서는 물의 혼탁도를 측정합니다.
@@ -2004,66 +1861,229 @@ namespace Sensors03 {
     }
 
 
-    /********** PIR 모션 센서 **********/
+    /********** 자외선(UV) 센서 **********/
 
-    //% block="PIR motion detected pin %pin"
-    //% group="Other Sensors" weight=50
-    export function pirRead(pin: DigitalPin): boolean {
-        return pins.digitalReadPin(pin) == 1
+    // 자외선 센서는 UV 지수를 측정합니다.
+    // ML8511, GUVA-S12SD 등 아날로그 UV 센서 지원
+
+    // UV 데이터 타입
+    export enum UVDataType {
+        //% block="UV index"
+        UVIndex = 0,
+        //% block="voltage(mV)"
+        Voltage = 1,
+        //% block="intensity(mW/cm²)"
+        Intensity = 2
+    }
+
+    // UV 보정 타입
+    export enum UVCalibration {
+        //% block="indoor (zero adjust)"
+        Indoor = 0,
+        //% block="outdoor (sunlight)"
+        Outdoor = 1
+    }
+
+    // UV 센서 상태 변수
+    let _uvPin: AnalogPin = AnalogPin.P0
+    let _uvRefVoltage: number = 3300  // mV
+    let _uvOffsetVoltage: number = 990  // 실내 기준 전압 (mV)
+
+    //% block="UV sensor setup: analog pin %pin"
+    //% pin.defl=AnalogPin.P0
+    //% group="UV Sensor" weight=135
+    export function uvInit(pin: AnalogPin): void {
+        _uvPin = pin
+        _uvRefVoltage = 3300
+        _uvOffsetVoltage = 990
+    }
+
+    //% block="UV sensor calibrate %calType, ref voltage: %voltage mV"
+    //% calType.defl=UVCalibration.Indoor
+    //% voltage.defl=990 voltage.min=0 voltage.max=3300
+    //% group="UV Sensor" weight=134
+    //% inlineInputMode=inline
+    export function uvCalibrate(calType: UVCalibration, voltage: number): void {
+        if (calType == UVCalibration.Indoor) {
+            // 실내에서 현재 전압을 영점으로 설정
+            if (voltage > 0) {
+                _uvOffsetVoltage = voltage
+            } else {
+                // 자동 측정
+                let analogSum = 0
+                for (let i = 0; i < 10; i++) {
+                    analogSum += pins.analogReadPin(_uvPin)
+                    basic.pause(10)
+                }
+                _uvOffsetVoltage = (analogSum / 10) * _uvRefVoltage / 1023
+            }
+        }
+    }
+
+    //% block="UV sensor read: %dtype"
+    //% dtype.defl=UVDataType.UVIndex
+    //% group="UV Sensor" weight=133
+    export function uvRead(dtype: UVDataType): number {
+        // 아날로그 값 읽기 (여러 번 읽어서 평균)
+        let analogSum = 0
+        for (let i = 0; i < 10; i++) {
+            analogSum += pins.analogReadPin(_uvPin)
+            basic.pause(10)
+        }
+        let analogValue = analogSum / 10
+
+        // 전압 계산 (mV)
+        let voltage = analogValue * _uvRefVoltage / 1023
+
+        if (dtype == UVDataType.Voltage) {
+            return Math.round(voltage)
+        }
+
+        // UV 강도 계산 (mW/cm²)
+        // ML8511 기준: 출력 전압 1V = 0 mW/cm², 2.8V = 15 mW/cm²
+        let intensity = (voltage - _uvOffsetVoltage) / 120  // 약 120mV per mW/cm²
+        if (intensity < 0) intensity = 0
+
+        if (dtype == UVDataType.Intensity) {
+            return Math.round(intensity * 100) / 100
+        }
+
+        // UV 지수 계산 (0-11+)
+        // UV Index = Intensity / 0.25 (대략적인 변환)
+        let uvIndex = intensity / 0.25
+        if (uvIndex < 0) uvIndex = 0
+        if (uvIndex > 15) uvIndex = 15
+
+        return Math.round(uvIndex * 10) / 10
     }
 
 
-    /********** 토양 수분 센서 **********/
+    /********** LM35 센서 **********/
 
-    //% block="soil moisture read pin %pin"
-    //% group="Other Sensors" weight=49
-    export function soilMoistureRead(pin: AnalogPin): number {
+    //% block="LM35 read temperature pin %pin unit %unit"
+    //% group="온도(LM35)" weight=125
+    export function lm35Read(pin: AnalogPin, unit: TempUnit): number {
+        let tempC = pins.analogReadPin(pin) * 0.48828125
+        if (unit == TempUnit.Fahrenheit) {
+            return tempC * 9 / 5 + 32
+        }
+        return tempC
+    }
+
+
+    /********** GP2Y0A21YK 적외선 거리 센서 **********/
+
+    //% block="GP2Y0A21YK read distance pin %pin unit %unit"
+    //% group="미세먼지(GP2Y0A21YK)" weight=120
+    export function gp2y0a21ykRead(pin: AnalogPin, unit: DistanceUnit): number {
+        let v = pins.analogReadPin(pin)
+        let cm = Math.floor(12343.85 / (v - 0.42))
+        if (unit == DistanceUnit.Inch) {
+            return Math.floor(cm / 2.54)
+        }
+        return cm
+    }
+
+
+    /********** US-100 초음파 센서 **********/
+
+    // US-100 핀 저장 변수
+    let _us100Trig: DigitalPin = DigitalPin.P1
+    let _us100Echo: DigitalPin = DigitalPin.P2
+
+    //% block="US-100 set trigger pin %trig echo pin %echo"
+    //% trig.defl=DigitalPin.P1 echo.defl=DigitalPin.P2
+    //% group="초음파(US-100)" weight=115
+    export function us100SetPins(trig: DigitalPin, echo: DigitalPin): void {
+        _us100Trig = trig
+        _us100Echo = echo
+    }
+
+    //% block="US-100 distance measure unit %unit"
+    //% group="초음파(US-100)" weight=114
+    export function us100Read(unit: DistanceUnit): number {
+        pins.digitalWritePin(_us100Trig, 0)
+        control.waitMicros(2)
+        pins.digitalWritePin(_us100Trig, 1)
+        control.waitMicros(10)
+        pins.digitalWritePin(_us100Trig, 0)
+        let d = pins.pulseIn(_us100Echo, PulseValue.High, 30000)
+        let cm = Math.floor(d / 58)
+
+        if (unit == DistanceUnit.Inch) {
+            return Math.floor(cm / 2.54)
+        }
+        return cm
+    }
+
+
+    /********** TEMT6000 조도 센서 **********/
+
+    //% block="TEMT6000 light intensity read pin %pin"
+    //% group="빛(TEMT6000)" weight=110
+    export function temt6000Read(pin: AnalogPin): number {
         return pins.analogReadPin(pin)
     }
 
 
-    /********** 수위 센서 **********/
+    /********** MQ-2 가스 센서 **********/
 
-    //% block="water level read pin %pin"
-    //% group="Other Sensors" weight=48
-    export function waterLevelRead(pin: AnalogPin): number {
+    //% block="MQ-2 gas concentration read pin %pin"
+    //% group="가스(MQ-2)" weight=105
+    export function mq2Read(pin: AnalogPin): number {
         return pins.analogReadPin(pin)
     }
 
 
-    /********** 사운드 센서 **********/
+    /********** MQ-135 공기질 센서 **********/
 
-    //% block="sound level read pin %pin"
-    //% group="Other Sensors" weight=47
-    export function soundRead(pin: AnalogPin): number {
+    //% block="MQ-135 air quality read pin %pin"
+    //% group="가스(MQ-135)" weight=100
+    export function mq135Read(pin: AnalogPin): number {
         return pins.analogReadPin(pin)
     }
 
 
-    /********** 진동 센서 **********/
+    /********** CCS811 CO2/VOC 센서 **********/
 
-    //% block="vibration detected pin %pin"
-    //% group="Other Sensors" weight=46
-    export function vibrationRead(pin: DigitalPin): boolean {
-        return pins.digitalReadPin(pin) == 1
+    // CCS811 측정 타입
+    export enum CCS811Type {
+        //% block="CO2(ppm)"
+        CO2 = 0,
+        //% block="TVOC(ppb)"
+        TVOC = 1
     }
 
+    // CCS811 데이터 저장 변수
+    let _ccs811Addr: number = 0x5A
+    let _ccs811CO2: number = 0
+    let _ccs811TVOC: number = 0
 
-    /********** 불꽃 센서 **********/
-
-    //% block="flame detected read pin %pin"
-    //% group="Other Sensors" weight=45
-    export function flameRead(pin: AnalogPin): number {
-        return pins.analogReadPin(pin)
+    //% block="CCS811 init"
+    //% group="CO2센서(CCS811)" weight=95
+    export function ccs811Init(): void {
+        // 앱 시작 명령
+        pins.i2cWriteNumber(_ccs811Addr, 0xF4, NumberFormat.UInt8BE)
+        basic.pause(100)
+        // 측정 모드 설정 (1초 간격)
+        pins.i2cWriteNumber(_ccs811Addr, 0x0110, NumberFormat.UInt16BE)
+        basic.pause(100)
     }
 
+    //% block="CCS811 read %ctype"
+    //% group="CO2센서(CCS811)" weight=94
+    export function ccs811Read(ctype: CCS811Type): number {
+        // 결과 레지스터 읽기
+        pins.i2cWriteNumber(_ccs811Addr, 0x02, NumberFormat.UInt8BE)
+        let buf = pins.i2cReadBuffer(_ccs811Addr, 4)
 
-    /********** 터치 센서 **********/
+        _ccs811CO2 = (buf[0] << 8) | buf[1]
+        _ccs811TVOC = (buf[2] << 8) | buf[3]
 
-    //% block="touch detected pin %pin"
-    //% group="Other Sensors" weight=44
-    export function touchRead(pin: DigitalPin): boolean {
-        return pins.digitalReadPin(pin) == 1
+        if (ctype == CCS811Type.CO2) {
+            return _ccs811CO2
+        }
+        return _ccs811TVOC
     }
 
 
@@ -2326,89 +2346,6 @@ namespace Sensors03 {
     }
 
 
-    /********** 로터리 엔코더 **********/
-
-    // 로터리 엔코더 (KY-040 등)
-    // 회전 방향 감지, 누적 카운터 지원
-
-    // 회전 방향
-    export enum RotaryDir {
-        //% block="stop"
-        None = 0,
-        //% block="clockwise"
-        CW = 1,
-        //% block="counter-clockwise"
-        CCW = -1
-    }
-
-    // 로터리 엔코더 상태 변수
-    let _rotaryDT: DigitalPin = DigitalPin.P2
-    let _rotaryCLK: DigitalPin = DigitalPin.P3
-    let _rotaryCounter: number = 0
-    let _rotaryLastCLK: number = 0
-    let _rotaryDirection: RotaryDir = RotaryDir.None
-
-    //% block="rotary encoder: DT pin %dt|CLK pin %clk|set"
-    //% dt.defl=DigitalPin.P2
-    //% clk.defl=DigitalPin.P3
-    //% group="Rotary Encoder" weight=195
-    //% inlineInputMode=inline
-    export function rotaryInit(dt: DigitalPin, clk: DigitalPin): void {
-        _rotaryDT = dt
-        _rotaryCLK = clk
-        _rotaryCounter = 0
-        _rotaryLastCLK = pins.digitalReadPin(clk)
-        _rotaryDirection = RotaryDir.None
-    }
-
-    //% block="rotary encoder rotate value"
-    //% group="Rotary Encoder" weight=194
-    export function rotaryRead(): number {
-        let currentCLK = pins.digitalReadPin(_rotaryCLK)
-        let change = 0
-
-        // CLK이 변했을 때만 감지
-        if (currentCLK != _rotaryLastCLK && currentCLK == 0) {
-            // DT 값으로 방향 판단
-            if (pins.digitalReadPin(_rotaryDT) != currentCLK) {
-                _rotaryCounter++
-                _rotaryDirection = RotaryDir.CW
-                change = 1
-            } else {
-                _rotaryCounter--
-                _rotaryDirection = RotaryDir.CCW
-                change = -1
-            }
-        }
-
-        _rotaryLastCLK = currentCLK
-        return change
-    }
-
-    //% block="rotary encoder rotate direction"
-    //% group="Rotary Encoder" weight=193
-    export function rotaryDirection(): RotaryDir {
-        rotaryRead()  // 상태 업데이트
-        let dir = _rotaryDirection
-        _rotaryDirection = RotaryDir.None  // 읽은 후 리셋
-        return dir
-    }
-
-    //% block="rotary encoder counter"
-    //% group="Rotary Encoder" weight=192
-    export function rotaryCounter(): number {
-        rotaryRead()  // 상태 업데이트
-        return _rotaryCounter
-    }
-
-    //% block="rotary encoder counter reset"
-    //% group="Rotary Encoder" weight=191
-    export function rotaryReset(): void {
-        _rotaryCounter = 0
-        _rotaryDirection = RotaryDir.None
-    }
-
-
     /********** 버튼 **********/
 
     //% block="button pressed? (digital pin %pin)"
@@ -2445,5 +2382,68 @@ namespace Sensors03 {
     //% group="Potentiometer" weight=59
     export function potentiometerPercent(pin: AnalogPin): number {
         return Math.floor(pins.analogReadPin(pin) / 10.23)
+    }
+
+
+    /********** PIR 모션 센서 **********/
+
+    //% block="PIR motion detected pin %pin"
+    //% group="Other Sensors" weight=50
+    export function pirRead(pin: DigitalPin): boolean {
+        return pins.digitalReadPin(pin) == 1
+    }
+
+
+    /********** 토양 수분 센서 **********/
+
+    //% block="soil moisture read pin %pin"
+    //% group="Other Sensors" weight=49
+    export function soilMoistureRead(pin: AnalogPin): number {
+        return pins.analogReadPin(pin)
+    }
+
+
+    /********** 수위 센서 **********/
+
+    //% block="water level read pin %pin"
+    //% group="Other Sensors" weight=48
+    export function waterLevelRead(pin: AnalogPin): number {
+        return pins.analogReadPin(pin)
+    }
+
+
+    /********** 사운드 센서 **********/
+
+    //% block="sound level read pin %pin"
+    //% group="Other Sensors" weight=47
+    export function soundRead(pin: AnalogPin): number {
+        return pins.analogReadPin(pin)
+    }
+
+
+    /********** 진동 센서 **********/
+
+    //% block="vibration detected pin %pin"
+    //% group="Other Sensors" weight=46
+    export function vibrationRead(pin: DigitalPin): boolean {
+        return pins.digitalReadPin(pin) == 1
+    }
+
+
+    /********** 불꽃 센서 **********/
+
+    //% block="flame detected read pin %pin"
+    //% group="Other Sensors" weight=45
+    export function flameRead(pin: AnalogPin): number {
+        return pins.analogReadPin(pin)
+    }
+
+
+    /********** 터치 센서 **********/
+
+    //% block="touch detected pin %pin"
+    //% group="Other Sensors" weight=44
+    export function touchRead(pin: DigitalPin): boolean {
+        return pins.digitalReadPin(pin) == 1
     }
 }

@@ -8,6 +8,988 @@
 namespace AdvSensors {
 
 
+    /********** RTC 모듈 (DS1302, DS1307, DS3231) **********/
+
+    // RTC(Real Time Clock)는 전원이 꺼져도 시간을 유지하는 모듈입니다.
+    // DS1307, DS3231: I2C 통신 (주소 0x68)
+    // DS1302: 3선 통신 (CLK, DAT, RST)
+
+    // RTC 시간 데이터
+    export enum RTCData {
+        //% block="year"
+        Year = 0,
+        //% block="month"
+        Month = 1,
+        //% block="day"
+        Day = 2,
+        //% block="hour"
+        Hour = 3,
+        //% block="minute"
+        Minute = 4,
+        //% block="second"
+        Second = 5,
+        //% block="day of week"
+        DayOfWeek = 6
+    }
+
+    // RTC 시간 문자열 형식
+    export enum RTCFormat {
+        //% block="year/month/day hour:minute:second"
+        Full = 0,
+        //% block="year/month/day"
+        DateOnly = 1,
+        //% block="hour:minute:second"
+        TimeOnly = 2,
+        //% block="hour:minute"
+        HourMinute = 3
+    }
+
+    // RTC SQW 출력 주파수
+    export enum RTCSqwFreq {
+        //% block="none"
+        Off = 0,
+        //% block="1Hz"
+        Freq1Hz = 1,
+        //% block="4.096kHz"
+        Freq4kHz = 2,
+        //% block="8.192kHz"
+        Freq8kHz = 3,
+        //% block="32.768kHz"
+        Freq32kHz = 4
+    }
+
+    // RTC 상태 변수
+    let _rtcAddr: number = 0x68  // DS1307/DS3231 I2C 주소
+    let _rtcYear: number = 2024
+    let _rtcMonth: number = 1
+    let _rtcDay: number = 1
+    let _rtcHour: number = 0
+    let _rtcMinute: number = 0
+    let _rtcSecond: number = 0
+    let _rtcDayOfWeek: number = 1
+
+    //% block="RTC(DS1307) set %addr"
+    //% addr.defl=0x68
+    //% group="실시간(RTC)" weight=180
+    export function rtcInit(addr: number): void {
+        _rtcAddr = addr
+        // DS1307/DS3231 초기화 - 오실레이터 활성화
+        let buf = pins.createBuffer(2)
+        buf[0] = 0x00  // 초 레지스터
+        buf[1] = 0x00  // CH 비트 = 0 (오실레이터 활성화)
+        pins.i2cWriteBuffer(_rtcAddr, buf)
+    }
+
+    //% block="RTC %addr|time set year %year|month %month|day %day|hour %hour|minute %minute|second %second"
+    //% addr.defl=1
+    //% year.defl=2024 year.min=2000 year.max=2099
+    //% month.defl=1 month.min=1 month.max=12
+    //% day.defl=1 day.min=1 day.max=31
+    //% hour.defl=12 hour.min=0 hour.max=23
+    //% minute.defl=0 minute.min=0 minute.max=59
+    //% second.defl=0 second.min=0 second.max=59
+    //% group="실시간(RTC)" weight=179
+    //% inlineInputMode=inline
+    export function rtcSetTime(addr: number, year: number, month: number, day: number, hour: number, minute: number, second: number): void {
+        let buf = pins.createBuffer(8)
+        buf[0] = 0x00  // 시작 레지스터
+        buf[1] = decToBcd(second)
+        buf[2] = decToBcd(minute)
+        buf[3] = decToBcd(hour)
+        buf[4] = 0x01  // 요일 (1-7)
+        buf[5] = decToBcd(day)
+        buf[6] = decToBcd(month)
+        buf[7] = decToBcd(year - 2000)
+
+        pins.i2cWriteBuffer(_rtcAddr, buf)
+
+        // 내부 변수 업데이트
+        _rtcYear = year
+        _rtcMonth = month
+        _rtcDay = day
+        _rtcHour = hour
+        _rtcMinute = minute
+        _rtcSecond = second
+    }
+
+    //% block="RTC %addr|get %data"
+    //% addr.defl=1
+    //% group="실시간(RTC)" weight=178
+    export function rtcGet(addr: number, data: RTCData): number {
+        rtcReadAll()
+
+        switch (data) {
+            case RTCData.Year: return _rtcYear
+            case RTCData.Month: return _rtcMonth
+            case RTCData.Day: return _rtcDay
+            case RTCData.Hour: return _rtcHour
+            case RTCData.Minute: return _rtcMinute
+            case RTCData.Second: return _rtcSecond
+            case RTCData.DayOfWeek: return _rtcDayOfWeek
+            default: return 0
+        }
+    }
+
+    //% block="RTC %addr|clock %action"
+    //% addr.defl=1
+    //% action.shadow="toggleOnOff" action.defl=true
+    //% group="실시간(RTC)" weight=177
+    export function rtcStart(addr: number, action: boolean): void {
+        // 초 레지스터의 CH 비트로 시계 시작/정지
+        pins.i2cWriteNumber(_rtcAddr, 0x00, NumberFormat.UInt8BE)
+        let seconds = pins.i2cReadNumber(_rtcAddr, NumberFormat.UInt8BE)
+
+        if (action) {
+            seconds &= 0x7F  // CH = 0 (시작)
+        } else {
+            seconds |= 0x80  // CH = 1 (정지)
+        }
+
+        let buf = pins.createBuffer(2)
+        buf[0] = 0x00
+        buf[1] = seconds
+        pins.i2cWriteBuffer(_rtcAddr, buf)
+    }
+
+    //% block="RTC %addr|SQW output %freq"
+    //% addr.defl=1
+    //% group="실시간(RTC)" weight=176
+    export function rtcSetSqw(addr: number, freq: RTCSqwFreq): void {
+        let control = 0x00
+
+        switch (freq) {
+            case RTCSqwFreq.Off:
+                control = 0x00
+                break
+            case RTCSqwFreq.Freq1Hz:
+                control = 0x10
+                break
+            case RTCSqwFreq.Freq4kHz:
+                control = 0x11
+                break
+            case RTCSqwFreq.Freq8kHz:
+                control = 0x12
+                break
+            case RTCSqwFreq.Freq32kHz:
+                control = 0x13
+                break
+        }
+
+        let buf = pins.createBuffer(2)
+        buf[0] = 0x07  // 컨트롤 레지스터
+        buf[1] = control
+        pins.i2cWriteBuffer(_rtcAddr, buf)
+    }
+
+    //% block="RTC %addr|time string get format %format"
+    //% addr.defl=1
+    //% group="실시간(RTC)" weight=175
+    export function rtcGetString(addr: number, format: RTCFormat): string {
+        rtcReadAll()
+
+        let dateStr = _rtcYear + "/" + padZero(_rtcMonth) + "/" + padZero(_rtcDay)
+        let timeStr = padZero(_rtcHour) + ":" + padZero(_rtcMinute) + ":" + padZero(_rtcSecond)
+
+        switch (format) {
+            case RTCFormat.Full:
+                return dateStr + " " + timeStr
+            case RTCFormat.DateOnly:
+                return dateStr
+            case RTCFormat.TimeOnly:
+                return timeStr
+            case RTCFormat.HourMinute:
+                return padZero(_rtcHour) + ":" + padZero(_rtcMinute)
+            default:
+                return dateStr + " " + timeStr
+        }
+    }
+
+    // RTC 전체 읽기 (내부 함수)
+    function rtcReadAll(): void {
+        pins.i2cWriteNumber(_rtcAddr, 0x00, NumberFormat.UInt8BE)
+        let buf = pins.i2cReadBuffer(_rtcAddr, 7)
+
+        _rtcSecond = bcdToDec(buf[0] & 0x7F)
+        _rtcMinute = bcdToDec(buf[1])
+        _rtcHour = bcdToDec(buf[2] & 0x3F)
+        _rtcDayOfWeek = buf[3]
+        _rtcDay = bcdToDec(buf[4])
+        _rtcMonth = bcdToDec(buf[5])
+        _rtcYear = 2000 + bcdToDec(buf[6])
+    }
+
+    // BCD ↔ 10진수 변환 (내부 함수)
+    function decToBcd(dec: number): number {
+        return Math.floor(dec / 10) * 16 + (dec % 10)
+    }
+
+    function bcdToDec(bcd: number): number {
+        return Math.floor(bcd / 16) * 10 + (bcd % 16)
+    }
+
+    function padZero(num: number): string {
+        return num < 10 ? "0" + num : "" + num
+    }
+
+
+    /********** BMP280 기압/온도 센서 **********/
+
+    // BMP280 측정 타입
+    export enum BMP280Type {
+        //% block="pressure(hPa)"
+        Pressure = 0,
+        //% block="temperature(°C)"
+        Temperature = 1
+    }
+
+    // BMP280 데이터 저장 변수
+    let _bmp280Addr: number = 0x76
+    let _bmp280Pressure: number = 0
+    let _bmp280Temp: number = 0
+
+    //% block="BMP280 init address %addr"
+    //% addr.defl=0x76
+    //% group="대기압(BMP280)" weight=170
+    export function bmp280Init(addr: number): void {
+        _bmp280Addr = addr
+        // 컨트롤 레지스터 설정 (Normal mode, oversampling x1)
+        pins.i2cWriteNumber(_bmp280Addr, 0xF427, NumberFormat.UInt16BE)
+        basic.pause(100)
+    }
+
+    //% block="BMP280 read %btype"
+    //% group="대기압(BMP280)" weight=169
+    export function bmp280Read(btype: BMP280Type): number {
+        // 기압 데이터 읽기 (0xF7~0xF9)
+        pins.i2cWriteNumber(_bmp280Addr, 0xF7, NumberFormat.UInt8BE)
+        let buf = pins.i2cReadBuffer(_bmp280Addr, 6)
+
+        let pressRaw = (buf[0] << 12) | (buf[1] << 4) | (buf[2] >> 4)
+        let tempRaw = (buf[3] << 12) | (buf[4] << 4) | (buf[5] >> 4)
+
+        // 간소화된 계산 (실제로는 보정 계수 필요)
+        _bmp280Temp = tempRaw / 5120.0
+        _bmp280Pressure = pressRaw / 256.0 / 100.0
+
+        if (btype == BMP280Type.Temperature) {
+            return _bmp280Temp
+        }
+        return _bmp280Pressure
+    }
+
+
+    /********** MPU6050 가속도/자이로 센서 **********/
+
+    // 축 선택
+    export enum Axis {
+        //% block="X"
+        X = 0,
+        //% block="Y"
+        Y = 1,
+        //% block="Z"
+        Z = 2
+    }
+
+    // MPU6050 측정 타입
+    export enum MPU6050Type {
+        //% block="acceleration"
+        Accel = 0,
+        //% block="gyro"
+        Gyro = 1,
+        //% block="temperature"
+        Temp = 2
+    }
+
+    // MPU6050 데이터 타입 (한글)
+    export enum MPU6050DataType {
+        //% block="temperature(°C)"
+        Temperature = 0,
+        //% block="accel X"
+        AccelX = 1,
+        //% block="accel Y"
+        AccelY = 2,
+        //% block="accel Z"
+        AccelZ = 3,
+        //% block="gyro X"
+        GyroX = 4,
+        //% block="gyro Y"
+        GyroY = 5,
+        //% block="gyro Z"
+        GyroZ = 6
+    }
+
+    // MPU6050 데이터 저장 변수
+    let _mpu6050Addr: number = 0x68
+    let _mpu6050GyroOffsetX: number = 0
+    let _mpu6050GyroOffsetY: number = 0
+    let _mpu6050GyroOffsetZ: number = 0
+    let _mpu6050AccelX: number = 0
+    let _mpu6050AccelY: number = 0
+    let _mpu6050AccelZ: number = 0
+    let _mpu6050GyroX: number = 0
+    let _mpu6050GyroY: number = 0
+    let _mpu6050GyroZ: number = 0
+    let _mpu6050Temp: number = 0
+
+    //% block="Gyro sensor(MPU6050) setup"
+    //% group="6축 가속도(MPU6050)" weight=165
+    export function mpu6050Setup(): void {
+        _mpu6050Addr = 0x68
+        // 슬립 모드 해제
+        pins.i2cWriteNumber(_mpu6050Addr, 0x6B00, NumberFormat.UInt16BE)
+        basic.pause(100)
+        // 자이로 범위 설정 (±250°/s)
+        pins.i2cWriteNumber(_mpu6050Addr, 0x1B00, NumberFormat.UInt16BE)
+        // 가속도 범위 설정 (±2g)
+        pins.i2cWriteNumber(_mpu6050Addr, 0x1C00, NumberFormat.UInt16BE)
+        basic.pause(10)
+    }
+
+    //% block="MPU6050 update values"
+    //% group="6축 가속도(MPU6050)" weight=164
+    export function mpu6050Update(): void {
+        // 가속도 읽기
+        pins.i2cWriteNumber(_mpu6050Addr, 0x3B, NumberFormat.UInt8BE)
+        let accelBuf = pins.i2cReadBuffer(_mpu6050Addr, 6)
+        _mpu6050AccelX = (accelBuf[0] << 8) | accelBuf[1]
+        if (_mpu6050AccelX > 32767) _mpu6050AccelX -= 65536
+        _mpu6050AccelY = (accelBuf[2] << 8) | accelBuf[3]
+        if (_mpu6050AccelY > 32767) _mpu6050AccelY -= 65536
+        _mpu6050AccelZ = (accelBuf[4] << 8) | accelBuf[5]
+        if (_mpu6050AccelZ > 32767) _mpu6050AccelZ -= 65536
+
+        // 온도 읽기
+        pins.i2cWriteNumber(_mpu6050Addr, 0x41, NumberFormat.UInt8BE)
+        let tempVal = pins.i2cReadNumber(_mpu6050Addr, NumberFormat.Int16BE)
+        _mpu6050Temp = Math.floor(tempVal / 340 + 36.53)
+
+        // 자이로 읽기 (오프셋 적용)
+        pins.i2cWriteNumber(_mpu6050Addr, 0x43, NumberFormat.UInt8BE)
+        let gyroBuf = pins.i2cReadBuffer(_mpu6050Addr, 6)
+        let rawGyroX = (gyroBuf[0] << 8) | gyroBuf[1]
+        if (rawGyroX > 32767) rawGyroX -= 65536
+        let rawGyroY = (gyroBuf[2] << 8) | gyroBuf[3]
+        if (rawGyroY > 32767) rawGyroY -= 65536
+        let rawGyroZ = (gyroBuf[4] << 8) | gyroBuf[5]
+        if (rawGyroZ > 32767) rawGyroZ -= 65536
+
+        _mpu6050GyroX = rawGyroX - _mpu6050GyroOffsetX
+        _mpu6050GyroY = rawGyroY - _mpu6050GyroOffsetY
+        _mpu6050GyroZ = rawGyroZ - _mpu6050GyroOffsetZ
+    }
+
+    //% block="MPU6050 read: %dtype"
+    //% dtype.defl=MPU6050DataType.Temperature
+    //% group="6축 가속도(MPU6050)" weight=163
+    export function mpu6050ReadValue(dtype: MPU6050DataType): number {
+        if (dtype == MPU6050DataType.Temperature) return _mpu6050Temp
+        if (dtype == MPU6050DataType.AccelX) return _mpu6050AccelX
+        if (dtype == MPU6050DataType.AccelY) return _mpu6050AccelY
+        if (dtype == MPU6050DataType.AccelZ) return _mpu6050AccelZ
+        if (dtype == MPU6050DataType.GyroX) return _mpu6050GyroX
+        if (dtype == MPU6050DataType.GyroY) return _mpu6050GyroY
+        return _mpu6050GyroZ
+    }
+
+    //% block="Gyro offset set X: %x Y: %y Z: %z"
+    //% x.defl=0 y.defl=0 z.defl=0
+    //% group="6축 가속도(MPU6050)" weight=162
+    //% inlineInputMode=inline
+    export function mpu6050SetGyroOffset(x: number, y: number, z: number): void {
+        _mpu6050GyroOffsetX = x
+        _mpu6050GyroOffsetY = y
+        _mpu6050GyroOffsetZ = z
+    }
+
+    //% block="Gyro auto calibrate stabilize: %stabilizeTime ms measure: %measureTime ms"
+    //% stabilizeTime.defl=1000 stabilizeTime.min=100 stabilizeTime.max=5000
+    //% measureTime.defl=3000 measureTime.min=500 measureTime.max=10000
+    //% group="6축 가속도(MPU6050)" weight=161
+    //% inlineInputMode=inline
+    export function mpu6050AutoCalibrate(stabilizeTime: number, measureTime: number): void {
+        // 안정화 대기
+        basic.pause(stabilizeTime)
+
+        // 측정 횟수 계산 (약 10ms 간격)
+        let samples = Math.floor(measureTime / 10)
+        let sumX = 0
+        let sumY = 0
+        let sumZ = 0
+
+        // 여러 번 측정하여 평균 계산
+        for (let i = 0; i < samples; i++) {
+            pins.i2cWriteNumber(_mpu6050Addr, 0x43, NumberFormat.UInt8BE)
+            let gyroBuf = pins.i2cReadBuffer(_mpu6050Addr, 6)
+
+            let rawX = (gyroBuf[0] << 8) | gyroBuf[1]
+            if (rawX > 32767) rawX -= 65536
+            let rawY = (gyroBuf[2] << 8) | gyroBuf[3]
+            if (rawY > 32767) rawY -= 65536
+            let rawZ = (gyroBuf[4] << 8) | gyroBuf[5]
+            if (rawZ > 32767) rawZ -= 65536
+
+            sumX += rawX
+            sumY += rawY
+            sumZ += rawZ
+
+            basic.pause(10)
+        }
+
+        // 오프셋 설정
+        _mpu6050GyroOffsetX = Math.round(sumX / samples)
+        _mpu6050GyroOffsetY = Math.round(sumY / samples)
+        _mpu6050GyroOffsetZ = Math.round(sumZ / samples)
+    }
+
+    //% block="MPU6050 init address %addr"
+    //% addr.defl=0x68
+    //% group="6축 가속도(MPU6050)" weight=160
+    export function mpu6050Init(addr: number): void {
+        _mpu6050Addr = addr
+        // 슬립 모드 해제
+        pins.i2cWriteNumber(_mpu6050Addr, 0x6B00, NumberFormat.UInt16BE)
+        basic.pause(100)
+    }
+
+    //% block="MPU6050 read %mtype axis %axis"
+    //% group="6축 가속도(MPU6050)" weight=159
+    export function mpu6050Read(mtype: MPU6050Type, axis: Axis): number {
+        let reg = 0x3B  // 가속도 X 시작 레지스터
+
+        if (mtype == MPU6050Type.Accel) {
+            reg = 0x3B + (axis * 2)
+        } else if (mtype == MPU6050Type.Gyro) {
+            reg = 0x43 + (axis * 2)
+        } else {
+            // 온도
+            reg = 0x41
+        }
+
+        pins.i2cWriteNumber(_mpu6050Addr, reg, NumberFormat.UInt8BE)
+        let val = pins.i2cReadNumber(_mpu6050Addr, NumberFormat.Int16BE)
+
+        if (mtype == MPU6050Type.Temp) {
+            return Math.floor(val / 340 + 36.53)
+        }
+        return val
+    }
+
+
+    /********** SGP30 TVOC 센서 **********/
+
+    // SGP30 측정 타입
+    export enum SGP30Type {
+        //% block="eCO2(ppm)"
+        eCO2 = 0,
+        //% block="TVOC(ppb)"
+        TVOC = 1
+    }
+
+    // SGP30 데이터 저장 변수
+    let _sgp30Addr: number = 0x58
+    let _sgp30eCO2: number = 0
+    let _sgp30TVOC: number = 0
+
+    //% block="SGP30 init"
+    //% group="CO2센서(SGP30)" weight=155
+    export function sgp30Init(): void {
+        // IAQ 초기화 명령
+        pins.i2cWriteNumber(_sgp30Addr, 0x2003, NumberFormat.UInt16BE)
+        basic.pause(10)
+    }
+
+    //% block="SGP30 measure run"
+    //% group="CO2센서(SGP30)" weight=154
+    export function sgp30Measure(): void {
+        // IAQ 측정 명령
+        pins.i2cWriteNumber(_sgp30Addr, 0x2008, NumberFormat.UInt16BE)
+        basic.pause(12)
+
+        // 결과 읽기 (6바이트: eCO2 + CRC + TVOC + CRC)
+        let buf = pins.i2cReadBuffer(_sgp30Addr, 6)
+
+        _sgp30eCO2 = (buf[0] << 8) | buf[1]
+        _sgp30TVOC = (buf[3] << 8) | buf[4]
+    }
+
+    //% block="SGP30 read %stype"
+    //% group="CO2센서(SGP30)" weight=153
+    export function sgp30Read(stype: SGP30Type): number {
+        if (stype == SGP30Type.eCO2) {
+            return _sgp30eCO2
+        }
+        return _sgp30TVOC
+    }
+
+
+    /********** VL53L0X 레이저 거리 센서 **********/
+
+    // VL53L0X 측정 모드
+    export enum VL53L0XMode {
+        //% block="Single (eSingle)"
+        Single = 0,
+        //% block="Continuous (eContinuous)"
+        Continuous = 1
+    }
+
+    // VL53L0X 정밀도
+    export enum VL53L0XPrecision {
+        //% block="High precision (eHigh)"
+        High = 0,
+        //% block="Low precision (eLow)"
+        Low = 1
+    }
+
+    // VL53L0X 제어
+    export enum VL53L0XControl {
+        //% block="Start"
+        Start = 0,
+        //% block="Stop"
+        Stop = 1
+    }
+
+    // VL53L0X 읽기 타입
+    export enum VL53L0XReadType {
+        //% block="Distance (mm)"
+        Distance = 0,
+        //% block="Ambient (Lux)"
+        Ambient = 1
+    }
+
+    // VL53L0X 데이터 저장 변수
+    let _vl53l0xAddr: number = 0x29
+    let _vl53l0xDistance: number = 0
+    let _vl53l0xAmbient: number = 0
+    let _vl53l0xMode: VL53L0XMode = VL53L0XMode.Single
+    let _vl53l0xPrecision: VL53L0XPrecision = VL53L0XPrecision.High
+
+    //% block="VL53L0X init I2C address %addr"
+    //% addr.defl=41
+    //% group="거리센서(VL53L0X)" weight=150
+    export function vl53l0xInit(addr: number): void {
+        _vl53l0xAddr = addr
+    }
+
+    //% block="VL53L0X set mode | mode %mode | precision %precision"
+    //% group="거리센서(VL53L0X)" weight=149
+    export function vl53l0xSetMode(mode: VL53L0XMode, precision: VL53L0XPrecision): void {
+        _vl53l0xMode = mode
+        _vl53l0xPrecision = precision
+
+        // 정밀도에 따른 타이밍 설정
+        let timingBudget = _vl53l0xPrecision == VL53L0XPrecision.High ? 200000 : 20000
+
+        // I2C로 설정 전송
+        pins.i2cWriteNumber(_vl53l0xAddr, 0x01, NumberFormat.UInt8BE)
+    }
+
+    //% block="VL53L0X control %control"
+    //% group="거리센서(VL53L0X)" weight=148
+    export function vl53l0xControl(control: VL53L0XControl): void {
+        if (control == VL53L0XControl.Start) {
+            // 측정 시작 명령
+            pins.i2cWriteNumber(_vl53l0xAddr, 0x00, NumberFormat.UInt8BE)
+
+            // 측정 대기
+            basic.pause(_vl53l0xPrecision == VL53L0XPrecision.High ? 200 : 20)
+
+            // 결과 읽기 (간소화된 구현)
+            let buf = pins.i2cReadBuffer(_vl53l0xAddr, 2)
+            _vl53l0xDistance = (buf[0] << 8) | buf[1]
+        }
+    }
+
+    //% block="VL53L0X read %readType"
+    //% group="거리센서(VL53L0X)" weight=147
+    export function vl53l0xRead(readType: VL53L0XReadType): number {
+        if (readType == VL53L0XReadType.Distance) {
+            return _vl53l0xDistance
+        }
+        return _vl53l0xAmbient
+    }
+
+
+    /********** SHT30 센서 **********/
+
+    // 온도 단위
+    export enum TempUnit {
+        //% block="Celsius (°C)"
+        Celsius = 0,
+        //% block="Fahrenheit (°F)"
+        Fahrenheit = 1
+    }
+
+    // SHT30 데이터 저장 변수
+    let _sht30Temperature: number = 0
+    let _sht30Humidity: number = 0
+    let _sht30Addr: number = 0x44
+
+    //% block="SHT30 init address %addr"
+    //% addr.defl=0x44
+    //% group="온습도(I2C-SHT30)" weight=145
+    export function sht30Init(addr: number): void {
+        _sht30Addr = addr
+    }
+
+    //% block="SHT30 start measurement"
+    //% group="온습도(I2C-SHT30)" weight=144
+    export function sht30Query(): void {
+        // 측정 명령 전송 (Single Shot, High Repeatability)
+        pins.i2cWriteNumber(_sht30Addr, 0x2400, NumberFormat.UInt16BE)
+
+        // 측정 대기 (15ms)
+        basic.pause(15)
+
+        // 6바이트 읽기 (온도2 + CRC + 습도2 + CRC)
+        let buf = pins.i2cReadBuffer(_sht30Addr, 6)
+
+        // 온도 계산
+        let tempRaw = (buf[0] << 8) | buf[1]
+        _sht30Temperature = -45 + (175 * tempRaw / 65535)
+
+        // 습도 계산
+        let humRaw = (buf[3] << 8) | buf[4]
+        _sht30Humidity = 100 * humRaw / 65535
+    }
+
+    //% block="SHT30 read temperature (unit %unit)"
+    //% group="온습도(I2C-SHT30)" weight=143
+    export function sht30ReadTemp(unit: TempUnit): number {
+        if (unit == TempUnit.Fahrenheit) {
+            return _sht30Temperature * 9 / 5 + 32
+        }
+        return _sht30Temperature
+    }
+
+    //% block="SHT30 read humidity"
+    //% group="온습도(I2C-SHT30)" weight=142
+    export function sht30ReadHumidity(): number {
+        return _sht30Humidity
+    }
+
+
+    /********** TCS34725 RGB 컬러 센서 **********/
+
+    // TCS34725 감지 색상 타입
+    export enum TCS34725DetectType {
+        //% block="raw"
+        Raw = 0,
+        //% block="color"
+        Color = 1
+    }
+
+    // TCS34725 색상 채널
+    export enum TCS34725Channel {
+        //% block="red"
+        Red = 0,
+        //% block="green"
+        Green = 1,
+        //% block="blue"
+        Blue = 2,
+        //% block="clear"
+        Clear = 3
+    }
+
+    // TCS34725 감지 색상
+    export enum TCS34725Color {
+        //% block="red"
+        Red = 0,
+        //% block="orange"
+        Orange = 1,
+        //% block="yellow"
+        Yellow = 2,
+        //% block="green"
+        Green = 3,
+        //% block="blue"
+        Blue = 4,
+        //% block="purple"
+        Purple = 5,
+        //% block="white"
+        White = 6,
+        //% block="black"
+        Black = 7
+    }
+
+    // RGB 색상
+    export enum RGBColor {
+        //% block="red(R)"
+        Red = 0,
+        //% block="green(G)"
+        Green = 1,
+        //% block="blue(B)"
+        Blue = 2,
+        //% block="clear(C)"
+        Clear = 3
+    }
+
+    // TCS34725 데이터 저장 변수
+    let _tcs34725Addr: number = 0x29
+    let _tcs34725R: number = 0
+    let _tcs34725G: number = 0
+    let _tcs34725B: number = 0
+    let _tcs34725C: number = 0
+    let _tcs34725R8: number = 0
+    let _tcs34725G8: number = 0
+    let _tcs34725B8: number = 0
+    let _tcs34725DetectedColor: TCS34725Color = TCS34725Color.Black
+
+    //% block="Color sensor(TCS34725) setup"
+    //% group="색상감지(TCS34725)" weight=135
+    export function tcs34725Setup(): void {
+        _tcs34725Addr = 0x29
+        // Enable 레지스터 (PON + AEN)
+        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x00, NumberFormat.UInt8BE)
+        pins.i2cWriteNumber(_tcs34725Addr, 0x03, NumberFormat.UInt8BE)
+        // 통합 시간 설정 (101ms)
+        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x01, NumberFormat.UInt8BE)
+        pins.i2cWriteNumber(_tcs34725Addr, 0xD5, NumberFormat.UInt8BE)
+        // 게인 설정 (4x)
+        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x0F, NumberFormat.UInt8BE)
+        pins.i2cWriteNumber(_tcs34725Addr, 0x01, NumberFormat.UInt8BE)
+        basic.pause(50)
+    }
+
+    //% block="Color sensor reset"
+    //% group="색상감지(TCS34725)" weight=134
+    export function tcs34725Reset(): void {
+        _tcs34725R = 0
+        _tcs34725G = 0
+        _tcs34725B = 0
+        _tcs34725C = 0
+        _tcs34725R8 = 0
+        _tcs34725G8 = 0
+        _tcs34725B8 = 0
+        _tcs34725DetectedColor = TCS34725Color.Black
+    }
+
+    //% block="Color sensor detect %dtype"
+    //% dtype.defl=TCS34725DetectType.Color
+    //% group="색상감지(TCS34725)" weight=133
+    export function tcs34725Detect(dtype: TCS34725DetectType): number {
+        // 모든 채널 읽기
+        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x14, NumberFormat.UInt8BE)
+        _tcs34725C = pins.i2cReadNumber(_tcs34725Addr, NumberFormat.UInt16LE)
+
+        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x16, NumberFormat.UInt8BE)
+        _tcs34725R = pins.i2cReadNumber(_tcs34725Addr, NumberFormat.UInt16LE)
+
+        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x18, NumberFormat.UInt8BE)
+        _tcs34725G = pins.i2cReadNumber(_tcs34725Addr, NumberFormat.UInt16LE)
+
+        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x1A, NumberFormat.UInt8BE)
+        _tcs34725B = pins.i2cReadNumber(_tcs34725Addr, NumberFormat.UInt16LE)
+
+        // 8비트로 변환 (0-255)
+        if (_tcs34725C > 0) {
+            _tcs34725R8 = Math.min(255, Math.round(_tcs34725R * 255 / _tcs34725C))
+            _tcs34725G8 = Math.min(255, Math.round(_tcs34725G * 255 / _tcs34725C))
+            _tcs34725B8 = Math.min(255, Math.round(_tcs34725B * 255 / _tcs34725C))
+        }
+
+        // 색상 판별
+        _tcs34725DetectedColor = tcs34725DetectColor()
+
+        if (dtype == TCS34725DetectType.Raw) {
+            return _tcs34725C
+        }
+        return _tcs34725DetectedColor
+    }
+
+    //% block="Color sensor %channel (0~255)"
+    //% channel.defl=TCS34725Channel.Red
+    //% group="색상감지(TCS34725)" weight=132
+    export function tcs34725GetChannel(channel: TCS34725Channel): number {
+        if (channel == TCS34725Channel.Red) return _tcs34725R8
+        if (channel == TCS34725Channel.Green) return _tcs34725G8
+        if (channel == TCS34725Channel.Blue) return _tcs34725B8
+        return Math.min(255, Math.round(_tcs34725C / 256))
+    }
+
+    //% block="Color sensor is %color ?"
+    //% color.defl=TCS34725Color.Red
+    //% group="색상감지(TCS34725)" weight=131
+    export function tcs34725IsColor(color: TCS34725Color): boolean {
+        return _tcs34725DetectedColor == color
+    }
+
+    // 색상 판별 내부 함수
+    function tcs34725DetectColor(): TCS34725Color {
+        let r = _tcs34725R8
+        let g = _tcs34725G8
+        let b = _tcs34725B8
+
+        // 밝기 계산
+        let brightness = (r + g + b) / 3
+
+        // 검정 (어두움)
+        if (brightness < 30) {
+            return TCS34725Color.Black
+        }
+
+        // 흰색 (모든 채널이 높고 비슷함)
+        if (brightness > 200 && Math.abs(r - g) < 30 && Math.abs(g - b) < 30) {
+            return TCS34725Color.White
+        }
+
+        // 색상 판별 (가장 높은 채널 기준)
+        if (r > g && r > b) {
+            if (g > b + 50) {
+                return TCS34725Color.Orange  // 빨강 + 초록 = 주황
+            }
+            if (g > b + 20 && g > 100) {
+                return TCS34725Color.Yellow  // 빨강 + 초록(높음) = 노랑
+            }
+            return TCS34725Color.Red
+        }
+
+        if (g > r && g > b) {
+            return TCS34725Color.Green
+        }
+
+        if (b > r && b > g) {
+            if (r > g + 30) {
+                return TCS34725Color.Purple  // 파랑 + 빨강 = 보라
+            }
+            return TCS34725Color.Blue
+        }
+
+        return TCS34725Color.White  // 기본값
+    }
+
+    //% block="TCS34725 init address %addr"
+    //% addr.defl=0x29
+    //% group="색상감지(TCS34725)" weight=130
+    export function tcs34725Init(addr: number): void {
+        _tcs34725Addr = addr
+        // Enable 레지스터 (PON + AEN)
+        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x00, NumberFormat.UInt8BE)
+        pins.i2cWriteNumber(_tcs34725Addr, 0x03, NumberFormat.UInt8BE)
+        // 통합 시간 설정
+        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x01, NumberFormat.UInt8BE)
+        pins.i2cWriteNumber(_tcs34725Addr, 0xD5, NumberFormat.UInt8BE)
+        basic.pause(50)
+    }
+
+    //% block="TCS34725 color read %color"
+    //% group="색상감지(TCS34725)" weight=129
+    export function tcs34725Read(color: RGBColor): number {
+        // Clear 데이터 읽기
+        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x14, NumberFormat.UInt8BE)
+        _tcs34725C = pins.i2cReadNumber(_tcs34725Addr, NumberFormat.UInt16LE)
+
+        // Red 데이터 읽기
+        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x16, NumberFormat.UInt8BE)
+        _tcs34725R = pins.i2cReadNumber(_tcs34725Addr, NumberFormat.UInt16LE)
+
+        // Green 데이터 읽기
+        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x18, NumberFormat.UInt8BE)
+        _tcs34725G = pins.i2cReadNumber(_tcs34725Addr, NumberFormat.UInt16LE)
+
+        // Blue 데이터 읽기
+        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x1A, NumberFormat.UInt8BE)
+        _tcs34725B = pins.i2cReadNumber(_tcs34725Addr, NumberFormat.UInt16LE)
+
+        if (color == RGBColor.Red) return _tcs34725R
+        if (color == RGBColor.Green) return _tcs34725G
+        if (color == RGBColor.Blue) return _tcs34725B
+        return _tcs34725C
+    }
+
+
+    /********** MLX90614 Infrared Temperature Sensor **********/
+
+    // MLX90614 Temperature Source
+    export enum MLX90614Source {
+        //% block="Object"
+        Object = 0,
+        //% block="Ambient"
+        Ambient = 1
+    }
+
+    // MLX90614 Temperature Unit
+    export enum MLX90614TempUnit {
+        //% block="Celsius (°C)"
+        Celsius = 0,
+        //% block="Fahrenheit (°F)"
+        Fahrenheit = 1,
+        //% block="Kelvin (K)"
+        Kelvin = 2
+    }
+
+    // MLX90614 Data Variables
+    let _mlx90614Addr: number = 0x5A
+    let _mlx90614ObjTemp: number = 0
+    let _mlx90614AmbTemp: number = 0
+
+    /**
+     * MLX90614 Temperature Sensor I2C Address Setup
+     * @param addr I2C address (default: 90 = 0x5A)
+     */
+    //% block="MLX90614 Sensor Setup I2C Address $addr"
+    //% addr.defl=90
+    //% group="비접촉온도(MLX90614)" weight=140
+    export function mlx90614Init(addr: number): void {
+        _mlx90614Addr = addr
+    }
+
+    /**
+     * MLX90614 Read Temperature
+     * @param source Temperature source (Object/Ambient)
+     * @param unit Temperature unit
+     */
+    //% block="$source Temperature Read as $unit"
+    //% source.defl=MLX90614Source.Object
+    //% unit.defl=MLX90614TempUnit.Celsius
+    //% group="비접촉온도(MLX90614)" weight=139
+    //% inlineInputMode=inline
+    export function mlx90614ReadTemp(source: MLX90614Source, unit: MLX90614TempUnit): number {
+        let cmd = source == MLX90614Source.Object ? 0x07 : 0x06
+
+        // SMBus read: send register address
+        pins.i2cWriteNumber(_mlx90614Addr, cmd, NumberFormat.UInt8BE)
+
+        // Read 3 bytes (2 bytes data + 1 byte PEC)
+        let buf = pins.i2cReadBuffer(_mlx90614Addr, 3)
+
+        // Temperature calculation (raw value is in 0.02K units)
+        let raw = (buf[1] << 8) | buf[0]
+        let tempK = raw * 0.02  // Kelvin temperature
+
+        // Store
+        if (source == MLX90614Source.Object) {
+            _mlx90614ObjTemp = tempK - 273.15
+        } else {
+            _mlx90614AmbTemp = tempK - 273.15
+        }
+
+        // Unit conversion
+        if (unit == MLX90614TempUnit.Kelvin) {
+            return Math.round(tempK * 100) / 100
+        } else if (unit == MLX90614TempUnit.Fahrenheit) {
+            return Math.round(((tempK - 273.15) * 9 / 5 + 32) * 100) / 100
+        } else {
+            return Math.round((tempK - 273.15) * 100) / 100
+        }
+    }
+
+    /**
+     * MLX90614 Object Temperature (Celsius)
+     */
+    //% block="MLX90614 Object Temperature (°C)"
+    //% group="비접촉온도(MLX90614)" weight=138
+    export function mlx90614ObjectTemp(): number {
+        return mlx90614ReadTemp(MLX90614Source.Object, MLX90614TempUnit.Celsius)
+    }
+
+    /**
+     * MLX90614 Ambient Temperature (Celsius)
+     */
+    //% block="MLX90614 Ambient Temperature (°C)"
+    //% group="비접촉온도(MLX90614)" weight=137
+    export function mlx90614AmbientTemp(): number {
+        return mlx90614ReadTemp(MLX90614Source.Ambient, MLX90614TempUnit.Celsius)
+    }
+
 
     /********** APDS9960 제스처/RGB/근접 센서 **********/
 
@@ -37,18 +1019,6 @@ namespace AdvSensors {
         Left = 3,
         //% block="right"
         Right = 4
-    }
-
-    // RGB 색상
-    export enum RGBColor {
-        //% block="red(R)"
-        Red = 0,
-        //% block="green(G)"
-        Green = 1,
-        //% block="blue(B)"
-        Blue = 2,
-        //% block="clear(C)"
-        Clear = 3
     }
 
     // APDS9960 센서 타입
@@ -298,547 +1268,6 @@ namespace AdvSensors {
     }
 
 
-    /********** TCS34725 RGB 컬러 센서 **********/
-
-    // TCS34725 감지 색상 타입
-    export enum TCS34725DetectType {
-        //% block="raw"
-        Raw = 0,
-        //% block="color"
-        Color = 1
-    }
-
-    // TCS34725 색상 채널
-    export enum TCS34725Channel {
-        //% block="red"
-        Red = 0,
-        //% block="green"
-        Green = 1,
-        //% block="blue"
-        Blue = 2,
-        //% block="clear"
-        Clear = 3
-    }
-
-    // TCS34725 감지 색상
-    export enum TCS34725Color {
-        //% block="red"
-        Red = 0,
-        //% block="orange"
-        Orange = 1,
-        //% block="yellow"
-        Yellow = 2,
-        //% block="green"
-        Green = 3,
-        //% block="blue"
-        Blue = 4,
-        //% block="purple"
-        Purple = 5,
-        //% block="white"
-        White = 6,
-        //% block="black"
-        Black = 7
-    }
-
-    // TCS34725 데이터 저장 변수
-    let _tcs34725Addr: number = 0x29
-    let _tcs34725R: number = 0
-    let _tcs34725G: number = 0
-    let _tcs34725B: number = 0
-    let _tcs34725C: number = 0
-    let _tcs34725R8: number = 0
-    let _tcs34725G8: number = 0
-    let _tcs34725B8: number = 0
-    let _tcs34725DetectedColor: TCS34725Color = TCS34725Color.Black
-
-    //% block="Color sensor(TCS34725) setup"
-    //% group="색상감지(TCS34725)" weight=135
-    export function tcs34725Setup(): void {
-        _tcs34725Addr = 0x29
-        // Enable 레지스터 (PON + AEN)
-        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x00, NumberFormat.UInt8BE)
-        pins.i2cWriteNumber(_tcs34725Addr, 0x03, NumberFormat.UInt8BE)
-        // 통합 시간 설정 (101ms)
-        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x01, NumberFormat.UInt8BE)
-        pins.i2cWriteNumber(_tcs34725Addr, 0xD5, NumberFormat.UInt8BE)
-        // 게인 설정 (4x)
-        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x0F, NumberFormat.UInt8BE)
-        pins.i2cWriteNumber(_tcs34725Addr, 0x01, NumberFormat.UInt8BE)
-        basic.pause(50)
-    }
-
-    //% block="Color sensor reset"
-    //% group="색상감지(TCS34725)" weight=134
-    export function tcs34725Reset(): void {
-        _tcs34725R = 0
-        _tcs34725G = 0
-        _tcs34725B = 0
-        _tcs34725C = 0
-        _tcs34725R8 = 0
-        _tcs34725G8 = 0
-        _tcs34725B8 = 0
-        _tcs34725DetectedColor = TCS34725Color.Black
-    }
-
-    //% block="Color sensor detect %dtype"
-    //% dtype.defl=TCS34725DetectType.Color
-    //% group="색상감지(TCS34725)" weight=133
-    export function tcs34725Detect(dtype: TCS34725DetectType): number {
-        // 모든 채널 읽기
-        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x14, NumberFormat.UInt8BE)
-        _tcs34725C = pins.i2cReadNumber(_tcs34725Addr, NumberFormat.UInt16LE)
-
-        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x16, NumberFormat.UInt8BE)
-        _tcs34725R = pins.i2cReadNumber(_tcs34725Addr, NumberFormat.UInt16LE)
-
-        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x18, NumberFormat.UInt8BE)
-        _tcs34725G = pins.i2cReadNumber(_tcs34725Addr, NumberFormat.UInt16LE)
-
-        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x1A, NumberFormat.UInt8BE)
-        _tcs34725B = pins.i2cReadNumber(_tcs34725Addr, NumberFormat.UInt16LE)
-
-        // 8비트로 변환 (0-255)
-        if (_tcs34725C > 0) {
-            _tcs34725R8 = Math.min(255, Math.round(_tcs34725R * 255 / _tcs34725C))
-            _tcs34725G8 = Math.min(255, Math.round(_tcs34725G * 255 / _tcs34725C))
-            _tcs34725B8 = Math.min(255, Math.round(_tcs34725B * 255 / _tcs34725C))
-        }
-
-        // 색상 판별
-        _tcs34725DetectedColor = tcs34725DetectColor()
-
-        if (dtype == TCS34725DetectType.Raw) {
-            return _tcs34725C
-        }
-        return _tcs34725DetectedColor
-    }
-
-    //% block="Color sensor %channel (0~255)"
-    //% channel.defl=TCS34725Channel.Red
-    //% group="색상감지(TCS34725)" weight=132
-    export function tcs34725GetChannel(channel: TCS34725Channel): number {
-        if (channel == TCS34725Channel.Red) return _tcs34725R8
-        if (channel == TCS34725Channel.Green) return _tcs34725G8
-        if (channel == TCS34725Channel.Blue) return _tcs34725B8
-        return Math.min(255, Math.round(_tcs34725C / 256))
-    }
-
-    //% block="Color sensor is %color ?"
-    //% color.defl=TCS34725Color.Red
-    //% group="색상감지(TCS34725)" weight=131
-    export function tcs34725IsColor(color: TCS34725Color): boolean {
-        return _tcs34725DetectedColor == color
-    }
-
-    // 색상 판별 내부 함수
-    function tcs34725DetectColor(): TCS34725Color {
-        let r = _tcs34725R8
-        let g = _tcs34725G8
-        let b = _tcs34725B8
-
-        // 밝기 계산
-        let brightness = (r + g + b) / 3
-
-        // 검정 (어두움)
-        if (brightness < 30) {
-            return TCS34725Color.Black
-        }
-
-        // 흰색 (모든 채널이 높고 비슷함)
-        if (brightness > 200 && Math.abs(r - g) < 30 && Math.abs(g - b) < 30) {
-            return TCS34725Color.White
-        }
-
-        // 색상 판별 (가장 높은 채널 기준)
-        if (r > g && r > b) {
-            if (g > b + 50) {
-                return TCS34725Color.Orange  // 빨강 + 초록 = 주황
-            }
-            if (g > b + 20 && g > 100) {
-                return TCS34725Color.Yellow  // 빨강 + 초록(높음) = 노랑
-            }
-            return TCS34725Color.Red
-        }
-
-        if (g > r && g > b) {
-            return TCS34725Color.Green
-        }
-
-        if (b > r && b > g) {
-            if (r > g + 30) {
-                return TCS34725Color.Purple  // 파랑 + 빨강 = 보라
-            }
-            return TCS34725Color.Blue
-        }
-
-        return TCS34725Color.White  // 기본값
-    }
-
-    //% block="TCS34725 init address %addr"
-    //% addr.defl=0x29
-    //% group="색상감지(TCS34725)" weight=130
-    export function tcs34725Init(addr: number): void {
-        _tcs34725Addr = addr
-        // Enable 레지스터 (PON + AEN)
-        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x00, NumberFormat.UInt8BE)
-        pins.i2cWriteNumber(_tcs34725Addr, 0x03, NumberFormat.UInt8BE)
-        // 통합 시간 설정
-        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x01, NumberFormat.UInt8BE)
-        pins.i2cWriteNumber(_tcs34725Addr, 0xD5, NumberFormat.UInt8BE)
-        basic.pause(50)
-    }
-
-    //% block="TCS34725 color read %color"
-    //% group="색상감지(TCS34725)" weight=129
-    export function tcs34725Read(color: RGBColor): number {
-        // Clear 데이터 읽기
-        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x14, NumberFormat.UInt8BE)
-        _tcs34725C = pins.i2cReadNumber(_tcs34725Addr, NumberFormat.UInt16LE)
-
-        // Red 데이터 읽기
-        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x16, NumberFormat.UInt8BE)
-        _tcs34725R = pins.i2cReadNumber(_tcs34725Addr, NumberFormat.UInt16LE)
-
-        // Green 데이터 읽기
-        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x18, NumberFormat.UInt8BE)
-        _tcs34725G = pins.i2cReadNumber(_tcs34725Addr, NumberFormat.UInt16LE)
-
-        // Blue 데이터 읽기
-        pins.i2cWriteNumber(_tcs34725Addr, 0x80 | 0x1A, NumberFormat.UInt8BE)
-        _tcs34725B = pins.i2cReadNumber(_tcs34725Addr, NumberFormat.UInt16LE)
-
-        if (color == RGBColor.Red) return _tcs34725R
-        if (color == RGBColor.Green) return _tcs34725G
-        if (color == RGBColor.Blue) return _tcs34725B
-        return _tcs34725C
-    }
-
-
-    /********** MPU6050 가속도/자이로 센서 **********/
-
-    // 축 선택
-    export enum Axis {
-        //% block="X"
-        X = 0,
-        //% block="Y"
-        Y = 1,
-        //% block="Z"
-        Z = 2
-    }
-
-    // MPU6050 측정 타입
-    export enum MPU6050Type {
-        //% block="acceleration"
-        Accel = 0,
-        //% block="gyro"
-        Gyro = 1,
-        //% block="temperature"
-        Temp = 2
-    }
-
-    // MPU6050 데이터 타입 (한글)
-    export enum MPU6050DataType {
-        //% block="temperature(°C)"
-        Temperature = 0,
-        //% block="accel X"
-        AccelX = 1,
-        //% block="accel Y"
-        AccelY = 2,
-        //% block="accel Z"
-        AccelZ = 3,
-        //% block="gyro X"
-        GyroX = 4,
-        //% block="gyro Y"
-        GyroY = 5,
-        //% block="gyro Z"
-        GyroZ = 6
-    }
-
-    // MPU6050 데이터 저장 변수
-    let _mpu6050Addr: number = 0x68
-    let _mpu6050GyroOffsetX: number = 0
-    let _mpu6050GyroOffsetY: number = 0
-    let _mpu6050GyroOffsetZ: number = 0
-    let _mpu6050AccelX: number = 0
-    let _mpu6050AccelY: number = 0
-    let _mpu6050AccelZ: number = 0
-    let _mpu6050GyroX: number = 0
-    let _mpu6050GyroY: number = 0
-    let _mpu6050GyroZ: number = 0
-    let _mpu6050Temp: number = 0
-
-    //% block="Gyro sensor(MPU6050) setup"
-    //% group="6축 가속도(MPU6050)" weight=165
-    export function mpu6050Setup(): void {
-        _mpu6050Addr = 0x68
-        // 슬립 모드 해제
-        pins.i2cWriteNumber(_mpu6050Addr, 0x6B00, NumberFormat.UInt16BE)
-        basic.pause(100)
-        // 자이로 범위 설정 (±250°/s)
-        pins.i2cWriteNumber(_mpu6050Addr, 0x1B00, NumberFormat.UInt16BE)
-        // 가속도 범위 설정 (±2g)
-        pins.i2cWriteNumber(_mpu6050Addr, 0x1C00, NumberFormat.UInt16BE)
-        basic.pause(10)
-    }
-
-    //% block="MPU6050 update values"
-    //% group="6축 가속도(MPU6050)" weight=164
-    export function mpu6050Update(): void {
-        // 가속도 읽기
-        pins.i2cWriteNumber(_mpu6050Addr, 0x3B, NumberFormat.UInt8BE)
-        let accelBuf = pins.i2cReadBuffer(_mpu6050Addr, 6)
-        _mpu6050AccelX = (accelBuf[0] << 8) | accelBuf[1]
-        if (_mpu6050AccelX > 32767) _mpu6050AccelX -= 65536
-        _mpu6050AccelY = (accelBuf[2] << 8) | accelBuf[3]
-        if (_mpu6050AccelY > 32767) _mpu6050AccelY -= 65536
-        _mpu6050AccelZ = (accelBuf[4] << 8) | accelBuf[5]
-        if (_mpu6050AccelZ > 32767) _mpu6050AccelZ -= 65536
-
-        // 온도 읽기
-        pins.i2cWriteNumber(_mpu6050Addr, 0x41, NumberFormat.UInt8BE)
-        let tempVal = pins.i2cReadNumber(_mpu6050Addr, NumberFormat.Int16BE)
-        _mpu6050Temp = Math.floor(tempVal / 340 + 36.53)
-
-        // 자이로 읽기 (오프셋 적용)
-        pins.i2cWriteNumber(_mpu6050Addr, 0x43, NumberFormat.UInt8BE)
-        let gyroBuf = pins.i2cReadBuffer(_mpu6050Addr, 6)
-        let rawGyroX = (gyroBuf[0] << 8) | gyroBuf[1]
-        if (rawGyroX > 32767) rawGyroX -= 65536
-        let rawGyroY = (gyroBuf[2] << 8) | gyroBuf[3]
-        if (rawGyroY > 32767) rawGyroY -= 65536
-        let rawGyroZ = (gyroBuf[4] << 8) | gyroBuf[5]
-        if (rawGyroZ > 32767) rawGyroZ -= 65536
-
-        _mpu6050GyroX = rawGyroX - _mpu6050GyroOffsetX
-        _mpu6050GyroY = rawGyroY - _mpu6050GyroOffsetY
-        _mpu6050GyroZ = rawGyroZ - _mpu6050GyroOffsetZ
-    }
-
-    //% block="MPU6050 read: %dtype"
-    //% dtype.defl=MPU6050DataType.Temperature
-    //% group="6축 가속도(MPU6050)" weight=163
-    export function mpu6050ReadValue(dtype: MPU6050DataType): number {
-        if (dtype == MPU6050DataType.Temperature) return _mpu6050Temp
-        if (dtype == MPU6050DataType.AccelX) return _mpu6050AccelX
-        if (dtype == MPU6050DataType.AccelY) return _mpu6050AccelY
-        if (dtype == MPU6050DataType.AccelZ) return _mpu6050AccelZ
-        if (dtype == MPU6050DataType.GyroX) return _mpu6050GyroX
-        if (dtype == MPU6050DataType.GyroY) return _mpu6050GyroY
-        return _mpu6050GyroZ
-    }
-
-    //% block="Gyro offset set X: %x Y: %y Z: %z"
-    //% x.defl=0 y.defl=0 z.defl=0
-    //% group="6축 가속도(MPU6050)" weight=162
-    //% inlineInputMode=inline
-    export function mpu6050SetGyroOffset(x: number, y: number, z: number): void {
-        _mpu6050GyroOffsetX = x
-        _mpu6050GyroOffsetY = y
-        _mpu6050GyroOffsetZ = z
-    }
-
-    //% block="Gyro auto calibrate stabilize: %stabilizeTime ms measure: %measureTime ms"
-    //% stabilizeTime.defl=1000 stabilizeTime.min=100 stabilizeTime.max=5000
-    //% measureTime.defl=3000 measureTime.min=500 measureTime.max=10000
-    //% group="6축 가속도(MPU6050)" weight=161
-    //% inlineInputMode=inline
-    export function mpu6050AutoCalibrate(stabilizeTime: number, measureTime: number): void {
-        // 안정화 대기
-        basic.pause(stabilizeTime)
-
-        // 측정 횟수 계산 (약 10ms 간격)
-        let samples = Math.floor(measureTime / 10)
-        let sumX = 0
-        let sumY = 0
-        let sumZ = 0
-
-        // 여러 번 측정하여 평균 계산
-        for (let i = 0; i < samples; i++) {
-            pins.i2cWriteNumber(_mpu6050Addr, 0x43, NumberFormat.UInt8BE)
-            let gyroBuf = pins.i2cReadBuffer(_mpu6050Addr, 6)
-
-            let rawX = (gyroBuf[0] << 8) | gyroBuf[1]
-            if (rawX > 32767) rawX -= 65536
-            let rawY = (gyroBuf[2] << 8) | gyroBuf[3]
-            if (rawY > 32767) rawY -= 65536
-            let rawZ = (gyroBuf[4] << 8) | gyroBuf[5]
-            if (rawZ > 32767) rawZ -= 65536
-
-            sumX += rawX
-            sumY += rawY
-            sumZ += rawZ
-
-            basic.pause(10)
-        }
-
-        // 오프셋 설정
-        _mpu6050GyroOffsetX = Math.round(sumX / samples)
-        _mpu6050GyroOffsetY = Math.round(sumY / samples)
-        _mpu6050GyroOffsetZ = Math.round(sumZ / samples)
-    }
-
-    //% block="MPU6050 init address %addr"
-    //% addr.defl=0x68
-    //% group="6축 가속도(MPU6050)" weight=160
-    export function mpu6050Init(addr: number): void {
-        _mpu6050Addr = addr
-        // 슬립 모드 해제
-        pins.i2cWriteNumber(_mpu6050Addr, 0x6B00, NumberFormat.UInt16BE)
-        basic.pause(100)
-    }
-
-    //% block="MPU6050 read %mtype axis %axis"
-    //% group="6축 가속도(MPU6050)" weight=159
-    export function mpu6050Read(mtype: MPU6050Type, axis: Axis): number {
-        let reg = 0x3B  // 가속도 X 시작 레지스터
-
-        if (mtype == MPU6050Type.Accel) {
-            reg = 0x3B + (axis * 2)
-        } else if (mtype == MPU6050Type.Gyro) {
-            reg = 0x43 + (axis * 2)
-        } else {
-            // 온도
-            reg = 0x41
-        }
-
-        pins.i2cWriteNumber(_mpu6050Addr, reg, NumberFormat.UInt8BE)
-        let val = pins.i2cReadNumber(_mpu6050Addr, NumberFormat.Int16BE)
-
-        if (mtype == MPU6050Type.Temp) {
-            return Math.floor(val / 340 + 36.53)
-        }
-        return val
-    }
-
-
-    /********** ADXL345 가속도 센서 **********/
-
-    // ADXL345 데이터 저장 변수
-    let _adxl345Addr: number = 0x53
-
-    //% block="ADXL345 init address %addr"
-    //% addr.defl=0x53
-    //% group="3축 가속도(ADXL345)" weight=85
-    export function adxl345Init(addr: number): void {
-        _adxl345Addr = addr
-        // 측정 모드 활성화 (POWER_CTL 레지스터)
-        pins.i2cWriteNumber(_adxl345Addr, 0x2D08, NumberFormat.UInt16BE)
-        // 데이터 포맷 설정 (±16g, Full Resolution)
-        pins.i2cWriteNumber(_adxl345Addr, 0x310B, NumberFormat.UInt16BE)
-        basic.pause(10)
-    }
-
-    //% block="ADXL345 acceleration read axis %axis"
-    //% group="3축 가속도(ADXL345)" weight=84
-    export function adxl345Read(axis: Axis): number {
-        let reg = 0x32 + (axis * 2)  // X=0x32, Y=0x34, Z=0x36
-
-        pins.i2cWriteNumber(_adxl345Addr, reg, NumberFormat.UInt8BE)
-        return pins.i2cReadNumber(_adxl345Addr, NumberFormat.Int16LE)
-    }
-
-
-    /********** BMP280 기압/온도 센서 **********/
-
-    // BMP280 측정 타입
-    export enum BMP280Type {
-        //% block="pressure(hPa)"
-        Pressure = 0,
-        //% block="temperature(°C)"
-        Temperature = 1
-    }
-
-    // BMP280 데이터 저장 변수
-    let _bmp280Addr: number = 0x76
-    let _bmp280Pressure: number = 0
-    let _bmp280Temp: number = 0
-
-    //% block="BMP280 init address %addr"
-    //% addr.defl=0x76
-    //% group="대기압(BMP280)" weight=170
-    export function bmp280Init(addr: number): void {
-        _bmp280Addr = addr
-        // 컨트롤 레지스터 설정 (Normal mode, oversampling x1)
-        pins.i2cWriteNumber(_bmp280Addr, 0xF427, NumberFormat.UInt16BE)
-        basic.pause(100)
-    }
-
-    //% block="BMP280 read %btype"
-    //% group="대기압(BMP280)" weight=169
-    export function bmp280Read(btype: BMP280Type): number {
-        // 기압 데이터 읽기 (0xF7~0xF9)
-        pins.i2cWriteNumber(_bmp280Addr, 0xF7, NumberFormat.UInt8BE)
-        let buf = pins.i2cReadBuffer(_bmp280Addr, 6)
-
-        let pressRaw = (buf[0] << 12) | (buf[1] << 4) | (buf[2] >> 4)
-        let tempRaw = (buf[3] << 12) | (buf[4] << 4) | (buf[5] >> 4)
-
-        // 간소화된 계산 (실제로는 보정 계수 필요)
-        _bmp280Temp = tempRaw / 5120.0
-        _bmp280Pressure = pressRaw / 256.0 / 100.0
-
-        if (btype == BMP280Type.Temperature) {
-            return _bmp280Temp
-        }
-        return _bmp280Pressure
-    }
-
-
-    /********** BME280 기압/온도/습도 센서 **********/
-
-    // BME280 측정 타입
-    export enum BME280Type {
-        //% block="pressure(hPa)"
-        Pressure = 0,
-        //% block="temperature(°C)"
-        Temperature = 1,
-        //% block="humidity(%)"
-        Humidity = 2
-    }
-
-    // BME280 데이터 저장 변수
-    let _bme280Addr: number = 0x76
-    let _bme280Pressure: number = 0
-    let _bme280Temp: number = 0
-    let _bme280Humidity: number = 0
-
-    //% block="BME280 init address %addr"
-    //% addr.defl=0x76
-    //% group="대기압(BME280)" weight=80
-    export function bme280Init(addr: number): void {
-        _bme280Addr = addr
-        // 습도 오버샘플링 설정
-        pins.i2cWriteNumber(_bme280Addr, 0xF201, NumberFormat.UInt16BE)
-        // 컨트롤 레지스터 설정 (Normal mode, oversampling x1)
-        pins.i2cWriteNumber(_bme280Addr, 0xF427, NumberFormat.UInt16BE)
-        basic.pause(100)
-    }
-
-    //% block="BME280 read %btype"
-    //% group="대기압(BME280)" weight=79
-    export function bme280Read(btype: BME280Type): number {
-        // 모든 데이터 읽기 (0xF7~0xFE)
-        pins.i2cWriteNumber(_bme280Addr, 0xF7, NumberFormat.UInt8BE)
-        let buf = pins.i2cReadBuffer(_bme280Addr, 8)
-
-        let pressRaw = (buf[0] << 12) | (buf[1] << 4) | (buf[2] >> 4)
-        let tempRaw = (buf[3] << 12) | (buf[4] << 4) | (buf[5] >> 4)
-        let humRaw = (buf[6] << 8) | buf[7]
-
-        // 간소화된 계산 (실제로는 보정 계수 필요)
-        _bme280Temp = tempRaw / 5120.0
-        _bme280Pressure = pressRaw / 256.0 / 100.0
-        _bme280Humidity = humRaw / 1024.0 * 100.0
-
-        if (btype == BME280Type.Temperature) {
-            return _bme280Temp
-        } else if (btype == BME280Type.Humidity) {
-            return _bme280Humidity
-        }
-        return _bme280Pressure
-    }
-
-
     /********** 심박 센서 (MAX30102/MAX30105) **********/
 
     // MAX30102/MAX30105는 심박수와 혈중산소포화도(SpO2)를 측정하는 센서입니다.
@@ -1075,6 +1504,263 @@ namespace AdvSensors {
 
         // IR LED 데이터 (3바이트)
         _hrIRLED = ((fifoData[3] & 0x03) << 16) | (fifoData[4] << 8) | fifoData[5]
+    }
+
+
+    /********** Si7021 Temperature & Humidity Sensor **********/
+
+    // Si7021 Value Type
+    export enum Si7021Value {
+        //% block="Temperature(°C)"
+        TempC = 0,
+        //% block="Temperature(°F)"
+        TempF = 1,
+        //% block="Humidity(%)"
+        Humidity = 2
+    }
+
+    // Si7021 Serial Type
+    export enum Si7021Serial {
+        //% block="A"
+        A = 0,
+        //% block="B"
+        B = 1
+    }
+
+    // Si7021 Data Variables
+    let _si7021Addr: number = 0x40
+    let _si7021Temp: number = 0
+    let _si7021Humidity: number = 0
+
+    /**
+     * Si7021 Temperature & Humidity Sensor Setup
+     */
+    //% block="Si7021 Sensor Setup"
+    //% group="온습도(Si7021)" weight=141
+    export function si7021Init(): void {
+        _si7021Addr = 0x40
+        // Soft Reset
+        pins.i2cWriteNumber(_si7021Addr, 0xFE, NumberFormat.UInt8BE)
+        basic.pause(15)
+    }
+
+    /**
+     * Si7021 Read Value
+     * @param valueType Value type to read
+     */
+    //% block="Si7021 Read Value: $valueType"
+    //% valueType.defl=Si7021Value.TempC
+    //% group="온습도(Si7021)" weight=140
+    export function si7021Read(valueType: Si7021Value): number {
+        if (valueType == Si7021Value.Humidity) {
+            // Humidity measurement command (Hold Master Mode)
+            pins.i2cWriteNumber(_si7021Addr, 0xE5, NumberFormat.UInt8BE)
+            basic.pause(25)
+
+            let buf = pins.i2cReadBuffer(_si7021Addr, 2)
+            let raw = (buf[0] << 8) | buf[1]
+            _si7021Humidity = ((125 * raw) / 65536) - 6
+            _si7021Humidity = Math.max(0, Math.min(100, _si7021Humidity))
+            return Math.round(_si7021Humidity * 100) / 100
+        } else {
+            // Temperature measurement command (Hold Master Mode)
+            pins.i2cWriteNumber(_si7021Addr, 0xE3, NumberFormat.UInt8BE)
+            basic.pause(25)
+
+            let buf = pins.i2cReadBuffer(_si7021Addr, 2)
+            let raw = (buf[0] << 8) | buf[1]
+            _si7021Temp = ((175.72 * raw) / 65536) - 46.85
+
+            if (valueType == Si7021Value.TempF) {
+                return Math.round((_si7021Temp * 9 / 5 + 32) * 100) / 100
+            }
+            return Math.round(_si7021Temp * 100) / 100
+        }
+    }
+
+    /**
+     * Si7021 Sensor Reset
+     */
+    //% block="Si7021 Sensor Reset"
+    //% group="온습도(Si7021)" weight=139
+    export function si7021Reset(): void {
+        pins.i2cWriteNumber(_si7021Addr, 0xFE, NumberFormat.UInt8BE)
+        basic.pause(15)
+    }
+
+    /**
+     * Si7021 Read Serial Number
+     * @param serialType Serial type (A or B)
+     */
+    //% block="Si7021 Read Serial: Serial $serialType"
+    //% serialType.defl=Si7021Serial.A
+    //% group="온습도(Si7021)" weight=138
+    export function si7021ReadSerial(serialType: Si7021Serial): number {
+        if (serialType == Si7021Serial.A) {
+            // Electronic ID 1st Byte (SNA)
+            pins.i2cWriteNumber(_si7021Addr, 0xFA0F, NumberFormat.UInt16BE)
+            basic.pause(10)
+            let buf = pins.i2cReadBuffer(_si7021Addr, 8)
+            return (buf[0] << 24) | (buf[2] << 16) | (buf[4] << 8) | buf[6]
+        } else {
+            // Electronic ID 2nd Byte (SNB)
+            pins.i2cWriteNumber(_si7021Addr, 0xFCC9, NumberFormat.UInt16BE)
+            basic.pause(10)
+            let buf = pins.i2cReadBuffer(_si7021Addr, 6)
+            return (buf[0] << 24) | (buf[1] << 16) | (buf[3] << 8) | buf[4]
+        }
+    }
+
+
+    /********** BH1750 조도 센서 **********/
+
+    // BH1750 데이터 저장 변수
+    let _bh1750Addr: number = 0x23
+
+    //% block="BH1750 init address %addr"
+    //% addr.defl=0x23
+    //% group="조도(BH1750)" weight=95
+    export function bh1750Init(addr: number): void {
+        _bh1750Addr = addr
+        // Power On
+        pins.i2cWriteNumber(_bh1750Addr, 0x01, NumberFormat.UInt8BE)
+        // 연속 고해상도 모드 (1 lux)
+        pins.i2cWriteNumber(_bh1750Addr, 0x10, NumberFormat.UInt8BE)
+        basic.pause(180)
+    }
+
+    //% block="BH1750 light intensity read (lux)"
+    //% group="조도(BH1750)" weight=94
+    export function bh1750Read(): number {
+        let buf = pins.i2cReadBuffer(_bh1750Addr, 2)
+        let raw = (buf[0] << 8) | buf[1]
+        return Math.floor(raw / 1.2)
+    }
+
+
+    /********** TSL2561 조도 센서 **********/
+
+    // TSL2561 데이터 저장 변수
+    let _tsl2561Addr: number = 0x39
+
+    //% block="TSL2561 init address %addr"
+    //% addr.defl=0x39
+    //% group="조도(TSL2561)" weight=90
+    export function tsl2561Init(addr: number): void {
+        _tsl2561Addr = addr
+        // Power On (Command + Control Register)
+        pins.i2cWriteNumber(_tsl2561Addr, 0x80, NumberFormat.UInt8BE)
+        pins.i2cWriteNumber(_tsl2561Addr, 0x03, NumberFormat.UInt8BE)
+        basic.pause(400)
+    }
+
+    //% block="TSL2561 light intensity read (lux)"
+    //% group="조도(TSL2561)" weight=89
+    export function tsl2561Read(): number {
+        // CH0 읽기 (Command + Word + CH0 Data)
+        pins.i2cWriteNumber(_tsl2561Addr, 0xAC, NumberFormat.UInt8BE)
+        let ch0 = pins.i2cReadNumber(_tsl2561Addr, NumberFormat.UInt16LE)
+
+        // CH1 읽기 (Command + Word + CH1 Data)
+        pins.i2cWriteNumber(_tsl2561Addr, 0xAE, NumberFormat.UInt8BE)
+        let ch1 = pins.i2cReadNumber(_tsl2561Addr, NumberFormat.UInt16LE)
+
+        // 간단한 Lux 계산
+        if (ch0 == 0) return 0
+        let ratio = ch1 / ch0
+        let lux = 0
+        if (ratio <= 0.5) {
+            lux = 0.0304 * ch0 - 0.062 * ch0 * Math.pow(ratio, 1.4)
+        } else if (ratio <= 0.61) {
+            lux = 0.0224 * ch0 - 0.031 * ch1
+        } else if (ratio <= 0.80) {
+            lux = 0.0128 * ch0 - 0.0153 * ch1
+        } else if (ratio <= 1.30) {
+            lux = 0.00146 * ch0 - 0.00112 * ch1
+        }
+        return Math.floor(lux)
+    }
+
+
+    /********** ADXL345 가속도 센서 **********/
+
+    // ADXL345 데이터 저장 변수
+    let _adxl345Addr: number = 0x53
+
+    //% block="ADXL345 init address %addr"
+    //% addr.defl=0x53
+    //% group="3축 가속도(ADXL345)" weight=85
+    export function adxl345Init(addr: number): void {
+        _adxl345Addr = addr
+        // 측정 모드 활성화 (POWER_CTL 레지스터)
+        pins.i2cWriteNumber(_adxl345Addr, 0x2D08, NumberFormat.UInt16BE)
+        // 데이터 포맷 설정 (±16g, Full Resolution)
+        pins.i2cWriteNumber(_adxl345Addr, 0x310B, NumberFormat.UInt16BE)
+        basic.pause(10)
+    }
+
+    //% block="ADXL345 acceleration read axis %axis"
+    //% group="3축 가속도(ADXL345)" weight=84
+    export function adxl345Read(axis: Axis): number {
+        let reg = 0x32 + (axis * 2)  // X=0x32, Y=0x34, Z=0x36
+
+        pins.i2cWriteNumber(_adxl345Addr, reg, NumberFormat.UInt8BE)
+        return pins.i2cReadNumber(_adxl345Addr, NumberFormat.Int16LE)
+    }
+
+
+    /********** BME280 기압/온도/습도 센서 **********/
+
+    // BME280 측정 타입
+    export enum BME280Type {
+        //% block="pressure(hPa)"
+        Pressure = 0,
+        //% block="temperature(°C)"
+        Temperature = 1,
+        //% block="humidity(%)"
+        Humidity = 2
+    }
+
+    // BME280 데이터 저장 변수
+    let _bme280Addr: number = 0x76
+    let _bme280Pressure: number = 0
+    let _bme280Temp: number = 0
+    let _bme280Humidity: number = 0
+
+    //% block="BME280 init address %addr"
+    //% addr.defl=0x76
+    //% group="대기압(BME280)" weight=80
+    export function bme280Init(addr: number): void {
+        _bme280Addr = addr
+        // 습도 오버샘플링 설정
+        pins.i2cWriteNumber(_bme280Addr, 0xF201, NumberFormat.UInt16BE)
+        // 컨트롤 레지스터 설정 (Normal mode, oversampling x1)
+        pins.i2cWriteNumber(_bme280Addr, 0xF427, NumberFormat.UInt16BE)
+        basic.pause(100)
+    }
+
+    //% block="BME280 read %btype"
+    //% group="대기압(BME280)" weight=79
+    export function bme280Read(btype: BME280Type): number {
+        // 모든 데이터 읽기 (0xF7~0xFE)
+        pins.i2cWriteNumber(_bme280Addr, 0xF7, NumberFormat.UInt8BE)
+        let buf = pins.i2cReadBuffer(_bme280Addr, 8)
+
+        let pressRaw = (buf[0] << 12) | (buf[1] << 4) | (buf[2] >> 4)
+        let tempRaw = (buf[3] << 12) | (buf[4] << 4) | (buf[5] >> 4)
+        let humRaw = (buf[6] << 8) | buf[7]
+
+        // 간소화된 계산 (실제로는 보정 계수 필요)
+        _bme280Temp = tempRaw / 5120.0
+        _bme280Pressure = pressRaw / 256.0 / 100.0
+        _bme280Humidity = humRaw / 1024.0 * 100.0
+
+        if (btype == BME280Type.Temperature) {
+            return _bme280Temp
+        } else if (btype == BME280Type.Humidity) {
+            return _bme280Humidity
+        }
+        return _bme280Pressure
     }
 
 
@@ -1397,229 +2083,6 @@ namespace AdvSensors {
         basic.pause(100)
     }
 
-    /********** RTC 모듈 (DS1302, DS1307, DS3231) **********/
-
-    // RTC(Real Time Clock)는 전원이 꺼져도 시간을 유지하는 모듈입니다.
-    // DS1307, DS3231: I2C 통신 (주소 0x68)
-    // DS1302: 3선 통신 (CLK, DAT, RST)
-
-    // RTC 시간 데이터
-    export enum RTCData {
-        //% block="year"
-        Year = 0,
-        //% block="month"
-        Month = 1,
-        //% block="day"
-        Day = 2,
-        //% block="hour"
-        Hour = 3,
-        //% block="minute"
-        Minute = 4,
-        //% block="second"
-        Second = 5,
-        //% block="day of week"
-        DayOfWeek = 6
-    }
-
-    // RTC 시간 문자열 형식
-    export enum RTCFormat {
-        //% block="year/month/day hour:minute:second"
-        Full = 0,
-        //% block="year/month/day"
-        DateOnly = 1,
-        //% block="hour:minute:second"
-        TimeOnly = 2,
-        //% block="hour:minute"
-        HourMinute = 3
-    }
-
-    // RTC SQW 출력 주파수
-    export enum RTCSqwFreq {
-        //% block="none"
-        Off = 0,
-        //% block="1Hz"
-        Freq1Hz = 1,
-        //% block="4.096kHz"
-        Freq4kHz = 2,
-        //% block="8.192kHz"
-        Freq8kHz = 3,
-        //% block="32.768kHz"
-        Freq32kHz = 4
-    }
-
-    // RTC 상태 변수
-    let _rtcAddr: number = 0x68  // DS1307/DS3231 I2C 주소
-    let _rtcYear: number = 2024
-    let _rtcMonth: number = 1
-    let _rtcDay: number = 1
-    let _rtcHour: number = 0
-    let _rtcMinute: number = 0
-    let _rtcSecond: number = 0
-    let _rtcDayOfWeek: number = 1
-
-    //% block="RTC(DS1307) set %addr"
-    //% addr.defl=0x68
-    //% group="실시간(RTC)" weight=180
-    export function rtcInit(addr: number): void {
-        _rtcAddr = addr
-        // DS1307/DS3231 초기화 - 오실레이터 활성화
-        let buf = pins.createBuffer(2)
-        buf[0] = 0x00  // 초 레지스터
-        buf[1] = 0x00  // CH 비트 = 0 (오실레이터 활성화)
-        pins.i2cWriteBuffer(_rtcAddr, buf)
-    }
-
-    //% block="RTC %addr|time set year %year|month %month|day %day|hour %hour|minute %minute|second %second"
-    //% addr.defl=1
-    //% year.defl=2024 year.min=2000 year.max=2099
-    //% month.defl=1 month.min=1 month.max=12
-    //% day.defl=1 day.min=1 day.max=31
-    //% hour.defl=12 hour.min=0 hour.max=23
-    //% minute.defl=0 minute.min=0 minute.max=59
-    //% second.defl=0 second.min=0 second.max=59
-    //% group="실시간(RTC)" weight=179
-    //% inlineInputMode=inline
-    export function rtcSetTime(addr: number, year: number, month: number, day: number, hour: number, minute: number, second: number): void {
-        let buf = pins.createBuffer(8)
-        buf[0] = 0x00  // 시작 레지스터
-        buf[1] = decToBcd(second)
-        buf[2] = decToBcd(minute)
-        buf[3] = decToBcd(hour)
-        buf[4] = 0x01  // 요일 (1-7)
-        buf[5] = decToBcd(day)
-        buf[6] = decToBcd(month)
-        buf[7] = decToBcd(year - 2000)
-
-        pins.i2cWriteBuffer(_rtcAddr, buf)
-
-        // 내부 변수 업데이트
-        _rtcYear = year
-        _rtcMonth = month
-        _rtcDay = day
-        _rtcHour = hour
-        _rtcMinute = minute
-        _rtcSecond = second
-    }
-
-    //% block="RTC %addr|get %data"
-    //% addr.defl=1
-    //% group="실시간(RTC)" weight=178
-    export function rtcGet(addr: number, data: RTCData): number {
-        rtcReadAll()
-
-        switch (data) {
-            case RTCData.Year: return _rtcYear
-            case RTCData.Month: return _rtcMonth
-            case RTCData.Day: return _rtcDay
-            case RTCData.Hour: return _rtcHour
-            case RTCData.Minute: return _rtcMinute
-            case RTCData.Second: return _rtcSecond
-            case RTCData.DayOfWeek: return _rtcDayOfWeek
-            default: return 0
-        }
-    }
-
-    //% block="RTC %addr|clock %action"
-    //% addr.defl=1
-    //% action.shadow="toggleOnOff" action.defl=true
-    //% group="실시간(RTC)" weight=177
-    export function rtcStart(addr: number, action: boolean): void {
-        // 초 레지스터의 CH 비트로 시계 시작/정지
-        pins.i2cWriteNumber(_rtcAddr, 0x00, NumberFormat.UInt8BE)
-        let seconds = pins.i2cReadNumber(_rtcAddr, NumberFormat.UInt8BE)
-
-        if (action) {
-            seconds &= 0x7F  // CH = 0 (시작)
-        } else {
-            seconds |= 0x80  // CH = 1 (정지)
-        }
-
-        let buf = pins.createBuffer(2)
-        buf[0] = 0x00
-        buf[1] = seconds
-        pins.i2cWriteBuffer(_rtcAddr, buf)
-    }
-
-    //% block="RTC %addr|SQW output %freq"
-    //% addr.defl=1
-    //% group="실시간(RTC)" weight=176
-    export function rtcSetSqw(addr: number, freq: RTCSqwFreq): void {
-        let control = 0x00
-
-        switch (freq) {
-            case RTCSqwFreq.Off:
-                control = 0x00
-                break
-            case RTCSqwFreq.Freq1Hz:
-                control = 0x10
-                break
-            case RTCSqwFreq.Freq4kHz:
-                control = 0x11
-                break
-            case RTCSqwFreq.Freq8kHz:
-                control = 0x12
-                break
-            case RTCSqwFreq.Freq32kHz:
-                control = 0x13
-                break
-        }
-
-        let buf = pins.createBuffer(2)
-        buf[0] = 0x07  // 컨트롤 레지스터
-        buf[1] = control
-        pins.i2cWriteBuffer(_rtcAddr, buf)
-    }
-
-    //% block="RTC %addr|time string get format %format"
-    //% addr.defl=1
-    //% group="실시간(RTC)" weight=175
-    export function rtcGetString(addr: number, format: RTCFormat): string {
-        rtcReadAll()
-
-        let dateStr = _rtcYear + "/" + padZero(_rtcMonth) + "/" + padZero(_rtcDay)
-        let timeStr = padZero(_rtcHour) + ":" + padZero(_rtcMinute) + ":" + padZero(_rtcSecond)
-
-        switch (format) {
-            case RTCFormat.Full:
-                return dateStr + " " + timeStr
-            case RTCFormat.DateOnly:
-                return dateStr
-            case RTCFormat.TimeOnly:
-                return timeStr
-            case RTCFormat.HourMinute:
-                return padZero(_rtcHour) + ":" + padZero(_rtcMinute)
-            default:
-                return dateStr + " " + timeStr
-        }
-    }
-
-    // RTC 전체 읽기 (내부 함수)
-    function rtcReadAll(): void {
-        pins.i2cWriteNumber(_rtcAddr, 0x00, NumberFormat.UInt8BE)
-        let buf = pins.i2cReadBuffer(_rtcAddr, 7)
-
-        _rtcSecond = bcdToDec(buf[0] & 0x7F)
-        _rtcMinute = bcdToDec(buf[1])
-        _rtcHour = bcdToDec(buf[2] & 0x3F)
-        _rtcDayOfWeek = buf[3]
-        _rtcDay = bcdToDec(buf[4])
-        _rtcMonth = bcdToDec(buf[5])
-        _rtcYear = 2000 + bcdToDec(buf[6])
-    }
-
-    // BCD ↔ 10진수 변환 (내부 함수)
-    function decToBcd(dec: number): number {
-        return Math.floor(dec / 10) * 16 + (dec % 10)
-    }
-
-    function bcdToDec(bcd: number): number {
-        return Math.floor(bcd / 16) * 10 + (bcd % 16)
-    }
-
-    function padZero(num: number): string {
-        return num < 10 ? "0" + num : "" + num
-    }
-
 
     /********** INA219 전류/전압 센서 **********/
 
@@ -1777,468 +2240,5 @@ namespace AdvSensors {
     //% group="Other" weight=48
     export function tiltSensorRead(pin: DigitalPin): boolean {
         return pins.digitalReadPin(pin) == 1
-    }
-
-
-    /********** VL53L0X 레이저 거리 센서 **********/
-
-    // VL53L0X 측정 모드
-    export enum VL53L0XMode {
-        //% block="Single (eSingle)"
-        Single = 0,
-        //% block="Continuous (eContinuous)"
-        Continuous = 1
-    }
-
-    // VL53L0X 정밀도
-    export enum VL53L0XPrecision {
-        //% block="High precision (eHigh)"
-        High = 0,
-        //% block="Low precision (eLow)"
-        Low = 1
-    }
-
-    // VL53L0X 제어
-    export enum VL53L0XControl {
-        //% block="Start"
-        Start = 0,
-        //% block="Stop"
-        Stop = 1
-    }
-
-    // VL53L0X 읽기 타입
-    export enum VL53L0XReadType {
-        //% block="Distance (mm)"
-        Distance = 0,
-        //% block="Ambient (Lux)"
-        Ambient = 1
-    }
-
-    // VL53L0X 데이터 저장 변수
-    let _vl53l0xAddr: number = 0x29
-    let _vl53l0xDistance: number = 0
-    let _vl53l0xAmbient: number = 0
-    let _vl53l0xMode: VL53L0XMode = VL53L0XMode.Single
-    let _vl53l0xPrecision: VL53L0XPrecision = VL53L0XPrecision.High
-
-    //% block="VL53L0X init I2C address %addr"
-    //% addr.defl=41
-    //% group="거리센서(VL53L0X)" weight=150
-    export function vl53l0xInit(addr: number): void {
-        _vl53l0xAddr = addr
-    }
-
-    //% block="VL53L0X set mode | mode %mode | precision %precision"
-    //% group="거리센서(VL53L0X)" weight=149
-    export function vl53l0xSetMode(mode: VL53L0XMode, precision: VL53L0XPrecision): void {
-        _vl53l0xMode = mode
-        _vl53l0xPrecision = precision
-
-        // 정밀도에 따른 타이밍 설정
-        let timingBudget = _vl53l0xPrecision == VL53L0XPrecision.High ? 200000 : 20000
-
-        // I2C로 설정 전송
-        pins.i2cWriteNumber(_vl53l0xAddr, 0x01, NumberFormat.UInt8BE)
-    }
-
-    //% block="VL53L0X control %control"
-    //% group="거리센서(VL53L0X)" weight=148
-    export function vl53l0xControl(control: VL53L0XControl): void {
-        if (control == VL53L0XControl.Start) {
-            // 측정 시작 명령
-            pins.i2cWriteNumber(_vl53l0xAddr, 0x00, NumberFormat.UInt8BE)
-
-            // 측정 대기
-            basic.pause(_vl53l0xPrecision == VL53L0XPrecision.High ? 200 : 20)
-
-            // 결과 읽기 (간소화된 구현)
-            let buf = pins.i2cReadBuffer(_vl53l0xAddr, 2)
-            _vl53l0xDistance = (buf[0] << 8) | buf[1]
-        }
-    }
-
-    //% block="VL53L0X read %readType"
-    //% group="거리센서(VL53L0X)" weight=147
-    export function vl53l0xRead(readType: VL53L0XReadType): number {
-        if (readType == VL53L0XReadType.Distance) {
-            return _vl53l0xDistance
-        }
-        return _vl53l0xAmbient
-    }
-
-
-    /********** SHT30 센서 **********/
-
-    // 온도 단위
-    export enum TempUnit {
-        //% block="Celsius (°C)"
-        Celsius = 0,
-        //% block="Fahrenheit (°F)"
-        Fahrenheit = 1
-    }
-
-    // SHT30 데이터 저장 변수
-    let _sht30Temperature: number = 0
-    let _sht30Humidity: number = 0
-    let _sht30Addr: number = 0x44
-
-    //% block="SHT30 init address %addr"
-    //% addr.defl=0x44
-    //% group="온습도(I2C-SHT30)" weight=145
-    export function sht30Init(addr: number): void {
-        _sht30Addr = addr
-    }
-
-    //% block="SHT30 start measurement"
-    //% group="온습도(I2C-SHT30)" weight=144
-    export function sht30Query(): void {
-        // 측정 명령 전송 (Single Shot, High Repeatability)
-        pins.i2cWriteNumber(_sht30Addr, 0x2400, NumberFormat.UInt16BE)
-
-        // 측정 대기 (15ms)
-        basic.pause(15)
-
-        // 6바이트 읽기 (온도2 + CRC + 습도2 + CRC)
-        let buf = pins.i2cReadBuffer(_sht30Addr, 6)
-
-        // 온도 계산
-        let tempRaw = (buf[0] << 8) | buf[1]
-        _sht30Temperature = -45 + (175 * tempRaw / 65535)
-
-        // 습도 계산
-        let humRaw = (buf[3] << 8) | buf[4]
-        _sht30Humidity = 100 * humRaw / 65535
-    }
-
-    //% block="SHT30 read temperature (unit %unit)"
-    //% group="온습도(I2C-SHT30)" weight=143
-    export function sht30ReadTemp(unit: TempUnit): number {
-        if (unit == TempUnit.Fahrenheit) {
-            return _sht30Temperature * 9 / 5 + 32
-        }
-        return _sht30Temperature
-    }
-
-    //% block="SHT30 read humidity"
-    //% group="온습도(I2C-SHT30)" weight=142
-    export function sht30ReadHumidity(): number {
-        return _sht30Humidity
-    }
-
-
-    /********** Si7021 Temperature & Humidity Sensor **********/
-
-    // Si7021 Value Type
-    export enum Si7021Value {
-        //% block="Temperature(°C)"
-        TempC = 0,
-        //% block="Temperature(°F)"
-        TempF = 1,
-        //% block="Humidity(%)"
-        Humidity = 2
-    }
-
-    // Si7021 Serial Type
-    export enum Si7021Serial {
-        //% block="A"
-        A = 0,
-        //% block="B"
-        B = 1
-    }
-
-    // Si7021 Data Variables
-    let _si7021Addr: number = 0x40
-    let _si7021Temp: number = 0
-    let _si7021Humidity: number = 0
-
-    /**
-     * Si7021 Temperature & Humidity Sensor Setup
-     */
-    //% block="Si7021 Sensor Setup"
-    //% group="온습도(Si7021)" weight=141
-    export function si7021Init(): void {
-        _si7021Addr = 0x40
-        // Soft Reset
-        pins.i2cWriteNumber(_si7021Addr, 0xFE, NumberFormat.UInt8BE)
-        basic.pause(15)
-    }
-
-    /**
-     * Si7021 Read Value
-     * @param valueType Value type to read
-     */
-    //% block="Si7021 Read Value: $valueType"
-    //% valueType.defl=Si7021Value.TempC
-    //% group="온습도(Si7021)" weight=140
-    export function si7021Read(valueType: Si7021Value): number {
-        if (valueType == Si7021Value.Humidity) {
-            // Humidity measurement command (Hold Master Mode)
-            pins.i2cWriteNumber(_si7021Addr, 0xE5, NumberFormat.UInt8BE)
-            basic.pause(25)
-            
-            let buf = pins.i2cReadBuffer(_si7021Addr, 2)
-            let raw = (buf[0] << 8) | buf[1]
-            _si7021Humidity = ((125 * raw) / 65536) - 6
-            _si7021Humidity = Math.max(0, Math.min(100, _si7021Humidity))
-            return Math.round(_si7021Humidity * 100) / 100
-        } else {
-            // Temperature measurement command (Hold Master Mode)
-            pins.i2cWriteNumber(_si7021Addr, 0xE3, NumberFormat.UInt8BE)
-            basic.pause(25)
-            
-            let buf = pins.i2cReadBuffer(_si7021Addr, 2)
-            let raw = (buf[0] << 8) | buf[1]
-            _si7021Temp = ((175.72 * raw) / 65536) - 46.85
-            
-            if (valueType == Si7021Value.TempF) {
-                return Math.round((_si7021Temp * 9 / 5 + 32) * 100) / 100
-            }
-            return Math.round(_si7021Temp * 100) / 100
-        }
-    }
-
-    /**
-     * Si7021 Sensor Reset
-     */
-    //% block="Si7021 Sensor Reset"
-    //% group="온습도(Si7021)" weight=139
-    export function si7021Reset(): void {
-        pins.i2cWriteNumber(_si7021Addr, 0xFE, NumberFormat.UInt8BE)
-        basic.pause(15)
-    }
-
-    /**
-     * Si7021 Read Serial Number
-     * @param serialType Serial type (A or B)
-     */
-    //% block="Si7021 Read Serial: Serial $serialType"
-    //% serialType.defl=Si7021Serial.A
-    //% group="온습도(Si7021)" weight=138
-    export function si7021ReadSerial(serialType: Si7021Serial): number {
-        if (serialType == Si7021Serial.A) {
-            // Electronic ID 1st Byte (SNA)
-            pins.i2cWriteNumber(_si7021Addr, 0xFA0F, NumberFormat.UInt16BE)
-            basic.pause(10)
-            let buf = pins.i2cReadBuffer(_si7021Addr, 8)
-            return (buf[0] << 24) | (buf[2] << 16) | (buf[4] << 8) | buf[6]
-        } else {
-            // Electronic ID 2nd Byte (SNB)
-            pins.i2cWriteNumber(_si7021Addr, 0xFCC9, NumberFormat.UInt16BE)
-            basic.pause(10)
-            let buf = pins.i2cReadBuffer(_si7021Addr, 6)
-            return (buf[0] << 24) | (buf[1] << 16) | (buf[3] << 8) | buf[4]
-        }
-    }
-
-
-    /********** MLX90614 Infrared Temperature Sensor **********/
-
-    // MLX90614 Temperature Source
-    export enum MLX90614Source {
-        //% block="Object"
-        Object = 0,
-        //% block="Ambient"
-        Ambient = 1
-    }
-
-    // MLX90614 Temperature Unit
-    export enum MLX90614TempUnit {
-        //% block="Celsius (°C)"
-        Celsius = 0,
-        //% block="Fahrenheit (°F)"
-        Fahrenheit = 1,
-        //% block="Kelvin (K)"
-        Kelvin = 2
-    }
-
-    // MLX90614 Data Variables
-    let _mlx90614Addr: number = 0x5A
-    let _mlx90614ObjTemp: number = 0
-    let _mlx90614AmbTemp: number = 0
-
-    /**
-     * MLX90614 Temperature Sensor I2C Address Setup
-     * @param addr I2C address (default: 90 = 0x5A)
-     */
-    //% block="MLX90614 Sensor Setup I2C Address $addr"
-    //% addr.defl=90
-    //% group="비접촉온도(MLX90614)" weight=140
-    export function mlx90614Init(addr: number): void {
-        _mlx90614Addr = addr
-    }
-
-    /**
-     * MLX90614 Read Temperature
-     * @param source Temperature source (Object/Ambient)
-     * @param unit Temperature unit
-     */
-    //% block="$source Temperature Read as $unit"
-    //% source.defl=MLX90614Source.Object
-    //% unit.defl=MLX90614TempUnit.Celsius
-    //% group="비접촉온도(MLX90614)" weight=139
-    //% inlineInputMode=inline
-    export function mlx90614ReadTemp(source: MLX90614Source, unit: MLX90614TempUnit): number {
-        let cmd = source == MLX90614Source.Object ? 0x07 : 0x06
-        
-        // SMBus read: send register address
-        pins.i2cWriteNumber(_mlx90614Addr, cmd, NumberFormat.UInt8BE)
-        
-        // Read 3 bytes (2 bytes data + 1 byte PEC)
-        let buf = pins.i2cReadBuffer(_mlx90614Addr, 3)
-        
-        // Temperature calculation (raw value is in 0.02K units)
-        let raw = (buf[1] << 8) | buf[0]
-        let tempK = raw * 0.02  // Kelvin temperature
-        
-        // Store
-        if (source == MLX90614Source.Object) {
-            _mlx90614ObjTemp = tempK - 273.15
-        } else {
-            _mlx90614AmbTemp = tempK - 273.15
-        }
-        
-        // Unit conversion
-        if (unit == MLX90614TempUnit.Kelvin) {
-            return Math.round(tempK * 100) / 100
-        } else if (unit == MLX90614TempUnit.Fahrenheit) {
-            return Math.round(((tempK - 273.15) * 9 / 5 + 32) * 100) / 100
-        } else {
-            return Math.round((tempK - 273.15) * 100) / 100
-        }
-    }
-
-    /**
-     * MLX90614 Object Temperature (Celsius)
-     */
-    //% block="MLX90614 Object Temperature (°C)"
-    //% group="비접촉온도(MLX90614)" weight=138
-    export function mlx90614ObjectTemp(): number {
-        return mlx90614ReadTemp(MLX90614Source.Object, MLX90614TempUnit.Celsius)
-    }
-
-    /**
-     * MLX90614 Ambient Temperature (Celsius)
-     */
-    //% block="MLX90614 Ambient Temperature (°C)"
-    //% group="비접촉온도(MLX90614)" weight=137
-    export function mlx90614AmbientTemp(): number {
-        return mlx90614ReadTemp(MLX90614Source.Ambient, MLX90614TempUnit.Celsius)
-    }
-
-
-    /********** SGP30 TVOC 센서 **********/
-
-    // SGP30 측정 타입
-    export enum SGP30Type {
-        //% block="eCO2(ppm)"
-        eCO2 = 0,
-        //% block="TVOC(ppb)"
-        TVOC = 1
-    }
-
-    // SGP30 데이터 저장 변수
-    let _sgp30Addr: number = 0x58
-    let _sgp30eCO2: number = 0
-    let _sgp30TVOC: number = 0
-
-    //% block="SGP30 init"
-    //% group="CO2센서(SGP30)" weight=155
-    export function sgp30Init(): void {
-        // IAQ 초기화 명령
-        pins.i2cWriteNumber(_sgp30Addr, 0x2003, NumberFormat.UInt16BE)
-        basic.pause(10)
-    }
-
-    //% block="SGP30 measure run"
-    //% group="CO2센서(SGP30)" weight=154
-    export function sgp30Measure(): void {
-        // IAQ 측정 명령
-        pins.i2cWriteNumber(_sgp30Addr, 0x2008, NumberFormat.UInt16BE)
-        basic.pause(12)
-
-        // 결과 읽기 (6바이트: eCO2 + CRC + TVOC + CRC)
-        let buf = pins.i2cReadBuffer(_sgp30Addr, 6)
-
-        _sgp30eCO2 = (buf[0] << 8) | buf[1]
-        _sgp30TVOC = (buf[3] << 8) | buf[4]
-    }
-
-    //% block="SGP30 read %stype"
-    //% group="CO2센서(SGP30)" weight=153
-    export function sgp30Read(stype: SGP30Type): number {
-        if (stype == SGP30Type.eCO2) {
-            return _sgp30eCO2
-        }
-        return _sgp30TVOC
-    }
-
-
-    /********** BH1750 조도 센서 **********/
-
-    // BH1750 데이터 저장 변수
-    let _bh1750Addr: number = 0x23
-
-    //% block="BH1750 init address %addr"
-    //% addr.defl=0x23
-    //% group="조도(BH1750)" weight=95
-    export function bh1750Init(addr: number): void {
-        _bh1750Addr = addr
-        // Power On
-        pins.i2cWriteNumber(_bh1750Addr, 0x01, NumberFormat.UInt8BE)
-        // 연속 고해상도 모드 (1 lux)
-        pins.i2cWriteNumber(_bh1750Addr, 0x10, NumberFormat.UInt8BE)
-        basic.pause(180)
-    }
-
-    //% block="BH1750 light intensity read (lux)"
-    //% group="조도(BH1750)" weight=94
-    export function bh1750Read(): number {
-        let buf = pins.i2cReadBuffer(_bh1750Addr, 2)
-        let raw = (buf[0] << 8) | buf[1]
-        return Math.floor(raw / 1.2)
-    }
-
-
-    /********** TSL2561 조도 센서 **********/
-
-    // TSL2561 데이터 저장 변수
-    let _tsl2561Addr: number = 0x39
-
-    //% block="TSL2561 init address %addr"
-    //% addr.defl=0x39
-    //% group="조도(TSL2561)" weight=90
-    export function tsl2561Init(addr: number): void {
-        _tsl2561Addr = addr
-        // Power On (Command + Control Register)
-        pins.i2cWriteNumber(_tsl2561Addr, 0x80, NumberFormat.UInt8BE)
-        pins.i2cWriteNumber(_tsl2561Addr, 0x03, NumberFormat.UInt8BE)
-        basic.pause(400)
-    }
-
-    //% block="TSL2561 light intensity read (lux)"
-    //% group="조도(TSL2561)" weight=89
-    export function tsl2561Read(): number {
-        // CH0 읽기 (Command + Word + CH0 Data)
-        pins.i2cWriteNumber(_tsl2561Addr, 0xAC, NumberFormat.UInt8BE)
-        let ch0 = pins.i2cReadNumber(_tsl2561Addr, NumberFormat.UInt16LE)
-
-        // CH1 읽기 (Command + Word + CH1 Data)
-        pins.i2cWriteNumber(_tsl2561Addr, 0xAE, NumberFormat.UInt8BE)
-        let ch1 = pins.i2cReadNumber(_tsl2561Addr, NumberFormat.UInt16LE)
-
-        // 간단한 Lux 계산
-        if (ch0 == 0) return 0
-        let ratio = ch1 / ch0
-        let lux = 0
-        if (ratio <= 0.5) {
-            lux = 0.0304 * ch0 - 0.062 * ch0 * Math.pow(ratio, 1.4)
-        } else if (ratio <= 0.61) {
-            lux = 0.0224 * ch0 - 0.031 * ch1
-        } else if (ratio <= 0.80) {
-            lux = 0.0128 * ch0 - 0.0153 * ch1
-        } else if (ratio <= 1.30) {
-            lux = 0.00146 * ch0 - 0.00112 * ch1
-        }
-        return Math.floor(lux)
     }
 }
