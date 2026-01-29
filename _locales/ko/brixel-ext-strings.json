@@ -751,10 +751,9 @@
     "OutputDevice.kt403aLoopPlay|block": "MP3 (KT403A) 반복 재생 %enable",
     "OutputDevice.kt403aPlayMp3Folder|block": "MP3 (KT403A) MP3 폴더 파일 %fileNum 재생",
     "OutputDevice.microphoneValue|block": "마이크 값 (0~1023) %pin",
-    "OutputDevice.microphoneAverage|block": "마이크 평균값 (샘플: %samples) %pin",
+    "OutputDevice.microphoneAverage|block": "마이크 평균 소리 크기 (아날로그 핀 %pin|샘플 %samples)",
     "OutputDevice.microphoneRead|block": "마이크 소리 크기 (아날로그 핀 %pin)",
     "OutputDevice.microphoneDetected|block": "마이크 소리 감지됨? (아날로그 핀 %pin|임계값 %threshold)",
-    "OutputDevice.microphoneAverage|block": "마이크 평균 소리 크기 (아날로그 핀 %pin|샘플 %samples)",
     "OutputDevice.SDFileMode.Read|block": "읽기",
     "OutputDevice.SDFileMode.Write|block": "쓰기",
     "OutputDevice.SDFileMode.Append|block": "추가",
@@ -885,5 +884,9 @@
     "USBSerial.serialGetParsedCount|block": "파싱된 값 개수",
     "USBSerial.serialGetValueFromText|block": "%index 번째 값 (문자열: « %text »)",
     "USBSerial.serialGetCountFromText|block": "파싱된 값 개수 (문자열: « %text »)",
-    "USBSerial.serialToNumber|block": "« %text » 숫자로 변환"
+    "USBSerial.serialToNumber|block": "« %text » 숫자로 변환",
+    "Sensors03.I2CWeightByte.ADC1|block": "ADC byte 1",
+    "Sensors03.I2CWeightByte.ADC2|block": "ADC byte 2",
+    "Sensors03.I2CWeightByte.ADC3|block": "ADC byte 3",
+    "Sensors03.FingerprintLED.Blink|block": "blink"
 }
