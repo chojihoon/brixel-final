@@ -580,7 +580,7 @@ namespace Displays01 {
 
     //% block="NeoPixel pin %pin|LED count %numLeds|format %mode"
     //% pin.defl=DigitalPin.P0
-    //% numLeds.defl=24 numLeds.min=1 numLeds.max=300
+    //% numLeds.defl=16 numLeds.min=1 numLeds.max=300
     //% group="네오픽셀(NeoPixel)" weight=100
     //% blockSetVariable=strip
     export function neopixelCreate(pin: DigitalPin, numLeds: number, mode: NeoPixelFormat): NeoPixelStrip {

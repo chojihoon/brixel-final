@@ -1,10 +1,10 @@
 /**
  * BRIXEL Extension - 04. Advanced Sensors
- * HX711, Rotary Encoder, Joystick, Keypad, Other Sensors
+ * RTC, BMP280, MPU6050, SGP30, VL53L0X, SHT30, TCS34725, CCS811, I2C Weight Sensor, etc.
  */
 
 //% weight=1070 color=#4D68EC icon="\uf0e7" block="04. Adv Sensors"
-//% groups="['실시간(RTC)', '대기압(BMP280)', '6축 가속도(MPU6050)', 'CO2센서(SGP30)', '거리센서(VL53L0X)', '온습도(I2C-SHT30)', '색상감지(TCS34725)', '비접촉온도(MLX90614)', '제스처(APDS9960)', '심박(MAX30102)', '온습도(Si7021)', '조도(BH1750)', '조도(TSL2561)', '3축 가속도(ADXL345)', '대기압(BME280)', 'Fingerprint', '전류/전압/전력 측정(INA219)', '전류 센서(ACS712)', '전압센서(Voltage Sensor)', 'Other']"
+//% groups="['실시간(RTC)', '대기압(BMP280)', '6축 가속도(MPU6050)', 'CO2센서(SGP30)', '거리센서(VL53L0X)', '온습도(I2C-SHT30)', '색상감지(TCS34725)', '비접촉온도(MLX90614)', '제스처(APDS9960)', '심박(MAX30102)', '온습도(Si7021)', '조도(BH1750)', '조도(TSL2561)', 'CO2센서(CCS811)', '3축 가속도(ADXL345)', '대기압(BME280)', 'Fingerprint', '전류/전압/전력 측정(INA219)', 'I2C 무게센서']"
 namespace AdvSensors {
 
 
@@ -2155,90 +2155,245 @@ namespace AdvSensors {
     }
 
 
-    /********** ACS712 전류 센서 **********/
+    /********** CCS811 CO2/VOC 센서 **********/
 
-    // ACS712는 홀 효과 기반 아날로그 전류 센서입니다.
-    // 5A, 20A, 30A 버전 있음
-
-    // ACS712 감도 타입
-    export enum ACS712Type {
-        //% block="5A (185mV/A)"
-        ACS712_5A = 185,
-        //% block="20A (100mV/A)"
-        ACS712_20A = 100,
-        //% block="30A (66mV/A)"
-        ACS712_30A = 66
+    // CCS811 측정 타입
+    export enum CCS811Type {
+        //% block="CO2(ppm)"
+        CO2 = 0,
+        //% block="TVOC(ppb)"
+        TVOC = 1
     }
 
-    //% block="ACS712 current (A)|pin %pin|type %sensorType"
-    //% pin.defl=AnalogPin.P0
-    //% sensorType.defl=ACS712Type.ACS712_20A
-    //% group="전류 센서(ACS712)" weight=60
-    export function acs712Current(pin: AnalogPin, sensorType: ACS712Type): number {
-        let raw = pins.analogReadPin(pin)
-        // micro:bit는 3.3V 기준, ACS712는 5V 기준이므로 변환 필요
-        let voltage = raw * 3.3 / 1023
-        // 2.5V가 0A 기준점 (실제로는 1.65V가 됨 - 3.3V 시스템)
-        let current = (voltage - 1.65) / (sensorType / 1000)
-        return Math.round(current * 100) / 100
+    // CCS811 데이터 저장 변수
+    let _ccs811Addr: number = 0x5A
+    let _ccs811CO2: number = 0
+    let _ccs811TVOC: number = 0
+
+    //% block="CCS811 init"
+    //% group="CO2센서(CCS811)" weight=88
+    export function ccs811Init(): void {
+        // 앱 시작 명령
+        pins.i2cWriteNumber(_ccs811Addr, 0xF4, NumberFormat.UInt8BE)
+        basic.pause(100)
+        // 측정 모드 설정 (1초 간격)
+        pins.i2cWriteNumber(_ccs811Addr, 0x0110, NumberFormat.UInt16BE)
+        basic.pause(100)
     }
 
+    //% block="CCS811 read %ctype"
+    //% group="CO2센서(CCS811)" weight=87
+    export function ccs811Read(ctype: CCS811Type): number {
+        // 결과 레지스터 읽기
+        pins.i2cWriteNumber(_ccs811Addr, 0x02, NumberFormat.UInt8BE)
+        let buf = pins.i2cReadBuffer(_ccs811Addr, 4)
 
-    /********** 전압 센서 (분압 모듈) **********/
+        _ccs811CO2 = (buf[0] << 8) | buf[1]
+        _ccs811TVOC = (buf[2] << 8) | buf[3]
 
-    // 전압 분압 모듈 (최대 25V 측정)
-    // 5:1 분압 비율
-
-    //% block="voltage sensor read (V)|pin %pin|maxvoltage %maxVoltage"
-    //% pin.defl=AnalogPin.P0
-    //% maxVoltage.defl=25
-    //% group="전압센서(Voltage Sensor)" weight=55
-    export function voltageRead(pin: AnalogPin, maxVoltage: number): number {
-        let raw = pins.analogReadPin(pin)
-        let voltage = raw * maxVoltage / 1023
-        return Math.round(voltage * 100) / 100
-    }
-
-    //% block="battery level (%)|pin %pin|minvoltage %minV|maxvoltage %maxV"
-    //% pin.defl=AnalogPin.P0
-    //% minV.defl=3.0 maxV.defl=4.2
-    //% group="전압센서(Voltage Sensor)" weight=54
-    //% inlineInputMode=inline
-    export function batteryPercent(pin: AnalogPin, minV: number, maxV: number): number {
-        let raw = pins.analogReadPin(pin)
-        let voltage = raw * 3.3 / 1023
-        let percent = (voltage - minV) / (maxV - minV) * 100
-        return Math.clamp(0, 100, Math.round(percent))
+        if (ctype == CCS811Type.CO2) {
+            return _ccs811CO2
+        }
+        return _ccs811TVOC
     }
 
 
-    /********** 레이저 모듈 **********/
+    /********** I2C 무게 센서 (NAU7802 등) **********/
 
-    //% block="laser %state|digital %pin pin"
-    //% state.shadow="toggleOnOff"
-    //% pin.defl=DigitalPin.P0
-    //% group="Other" weight=50
-    export function laser(state: boolean, pin: DigitalPin): void {
-        pins.digitalWritePin(pin, state ? 1 : 0)
+    // I2C 기반 무게 센서 (NAU7802, SparkFun Qwiic Scale 등)
+    // 24비트 ADC로 고정밀 무게 측정 지원
+
+    // I2C Weight Sensor data byte type
+    export enum I2CWeightByte {
+        //% block="0 (status)"
+        Status = 0,
+        //% block="1 (data High)"
+        DataHigh = 1,
+        //% block="2 (data Mid)"
+        DataMid = 2,
+        //% block="3 (data Low)"
+        DataLow = 3
     }
 
+    // I2C 무게센서 상태 변수
+    let _i2cWeightAddr: number = 0x2A  // NAU7802 기본 주소
+    let _i2cWeightOffset: number = 0
+    let _i2cWeightScale: number = 1
+    let _i2cWeightInitialized: boolean = false
 
-    /********** 리드 스위치 **********/
+    /**
+     * I2C 무게센서 주소 설정
+     * @param addr I2C 주소 (기본값: 0x2A = 42, 또는 99 등)
+     */
+    //% block="I2C Weight Sensor set address $addr"
+    //% addr.defl=99
+    //% group="I2C 무게센서" weight=58
+    export function i2cWeightSetAddress(addr: number): void {
+        _i2cWeightAddr = addr
+        _i2cWeightInitialized = false
 
-    //% block="reed switch detected? (digital pin %pin)"
-    //% pin.defl=DigitalPin.P0
-    //% group="Other" weight=49
-    export function reedSwitchRead(pin: DigitalPin): boolean {
-        return pins.digitalReadPin(pin) == 1
+        // 센서 초기화 시도
+        try {
+            // PU_CTRL 레지스터 설정 (전원 켜기)
+            pins.i2cWriteNumber(_i2cWeightAddr, 0x0001, NumberFormat.UInt16BE)
+            basic.pause(10)
+
+            // 디지털 파워 켜기
+            pins.i2cWriteNumber(_i2cWeightAddr, 0x0002, NumberFormat.UInt16BE)
+            basic.pause(10)
+
+            // ADC 시작
+            pins.i2cWriteNumber(_i2cWeightAddr, 0x0006, NumberFormat.UInt16BE)
+            basic.pause(100)
+
+            _i2cWeightInitialized = true
+        } catch {
+            _i2cWeightInitialized = false
+        }
     }
 
+    /**
+     * I2C 센서에서 무게 읽기
+     * @returns 보정된 무게 값
+     */
+    //% block="I2C Weight Sensor read weight"
+    //% group="I2C 무게센서" weight=57
+    export function i2cWeightRead(): number {
+        let raw = i2cWeightReadRaw24bit()
+        return (raw - _i2cWeightOffset) / _i2cWeightScale
+    }
 
-    /********** 틸트 센서 **********/
+    /**
+     * I2C 무게센서 사용 가능 여부 확인
+     * @returns 센서가 준비되면 true
+     */
+    //% block="I2C Weight Sensor is available"
+    //% group="I2C 무게센서" weight=56
+    export function i2cWeightIsAvailable(): boolean {
+        if (!_i2cWeightInitialized) {
+            return false
+        }
 
-    //% block="tilt sensor tilted? (digital pin %pin)"
-    //% pin.defl=DigitalPin.P0
-    //% group="Other" weight=48
-    export function tiltSensorRead(pin: DigitalPin): boolean {
-        return pins.digitalReadPin(pin) == 1
+        try {
+            // 상태 레지스터 읽기
+            pins.i2cWriteNumber(_i2cWeightAddr, 0x00, NumberFormat.UInt8BE)
+            let status = pins.i2cReadNumber(_i2cWeightAddr, NumberFormat.UInt8BE)
+            // CR (Conversion Ready) 비트 확인
+            return (status & 0x20) != 0
+        } catch {
+            return false
+        }
+    }
+
+    /**
+     * I2C 센서에서 원시 데이터 바이트 읽기
+     * @param byteType 읽을 바이트 타입
+     * @returns 해당 바이트 값
+     */
+    //% block="I2C Weight Sensor read raw byte $byteType"
+    //% byteType.defl=I2CWeightByte.Status
+    //% group="I2C 무게센서" weight=55
+    export function i2cWeightReadByte(byteType: I2CWeightByte): number {
+        try {
+            if (byteType == I2CWeightByte.Status) {
+                // 상태 레지스터 (0x00)
+                pins.i2cWriteNumber(_i2cWeightAddr, 0x00, NumberFormat.UInt8BE)
+                return pins.i2cReadNumber(_i2cWeightAddr, NumberFormat.UInt8BE)
+            } else {
+                // ADC 데이터 레지스터 (0x12, 0x13, 0x14)
+                let regAddr = 0x12 + (byteType - 1)
+                pins.i2cWriteNumber(_i2cWeightAddr, regAddr, NumberFormat.UInt8BE)
+                return pins.i2cReadNumber(_i2cWeightAddr, NumberFormat.UInt8BE)
+            }
+        } catch {
+            return -1
+        }
+    }
+
+    /**
+     * I2C 무게센서 영점 조정 (Tare)
+     * @param samples 평균을 낼 샘플 수
+     */
+    //% block="I2C Weight Sensor tare samples $samples"
+    //% samples.defl=10
+    //% group="I2C 무게센서" weight=54
+    export function i2cWeightTare(samples: number): void {
+        let sum = 0
+        for (let i = 0; i < samples; i++) {
+            sum += i2cWeightReadRaw24bit()
+            basic.pause(50)
+        }
+        _i2cWeightOffset = Math.floor(sum / samples)
+    }
+
+    /**
+     * I2C 무게센서 스케일 설정
+     * @param scale 스케일 값 (예: 알려진 무게로 나눈 원시 값)
+     */
+    //% block="I2C Weight Sensor set scale $scale"
+    //% scale.defl=1
+    //% group="I2C 무게센서" weight=53
+    export function i2cWeightSetScale(scale: number): void {
+        _i2cWeightScale = scale
+    }
+
+    /**
+     * I2C 무게센서 24비트 원시 값 읽기
+     * @returns 24비트 ADC 값
+     */
+    //% block="I2C Weight Sensor read raw 24bit"
+    //% group="I2C 무게센서" weight=52
+    export function i2cWeightReadRaw24bit(): number {
+        try {
+            // 변환 완료 대기
+            let timeout = 100
+            while (!i2cWeightIsAvailable() && timeout > 0) {
+                basic.pause(10)
+                timeout--
+            }
+
+            // ADC 출력 레지스터 읽기 (0x12 ~ 0x14, 3바이트)
+            pins.i2cWriteNumber(_i2cWeightAddr, 0x12, NumberFormat.UInt8BE)
+            let buf = pins.i2cReadBuffer(_i2cWeightAddr, 3)
+
+            let value = (buf[0] << 16) | (buf[1] << 8) | buf[2]
+
+            // 24비트 부호 있는 정수 처리
+            if (value & 0x800000) {
+                value = value - 0x1000000
+            }
+
+            return value
+        } catch {
+            return 0
+        }
+    }
+
+    /**
+     * I2C 무게센서 게인 설정
+     * @param gain 게인 값 (1, 2, 4, 8, 16, 32, 64, 128)
+     */
+    //% block="I2C Weight Sensor set gain $gain"
+    //% gain.defl=128
+    //% group="I2C 무게센서" weight=51
+    export function i2cWeightSetGain(gain: number): void {
+        let gainBits = 7  // 기본 128
+        if (gain <= 1) gainBits = 0
+        else if (gain <= 2) gainBits = 1
+        else if (gain <= 4) gainBits = 2
+        else if (gain <= 8) gainBits = 3
+        else if (gain <= 16) gainBits = 4
+        else if (gain <= 32) gainBits = 5
+        else if (gain <= 64) gainBits = 6
+        else gainBits = 7
+
+        try {
+            // CTRL1 레지스터 (0x01)에 게인 설정
+            let regValue = (gainBits << 4) | 0x04  // VLDO 3.0V
+            pins.i2cWriteNumber(_i2cWeightAddr, 0x01, NumberFormat.UInt8BE)
+            pins.i2cWriteNumber(_i2cWeightAddr, regValue, NumberFormat.UInt8BE)
+        } catch {
+            // 에러 무시
+        }
     }
 }
