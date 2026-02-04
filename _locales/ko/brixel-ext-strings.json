@@ -390,7 +390,7 @@
     "Sensors03.ACS712Type.ACS712_30A|block": "30A (66mV/A)",
     "Sensors03.acs712Current|block": "ACS712 전류 (A)|핀 %pin|타입 %sensorType",
     "Sensors03.voltageRead|block": "전압 센서 읽기 (V)|핀 %pin|최대전압 %maxVoltage",
-    "Sensors03.batteryPercent|block": "배터리 잔량 (%) 핀 %pin 최소전압 %minV 최대전압 %maxV",
+    "Sensors03.batteryPercent|block": "배터리 잔량 퍼센트 핀 %pin 최소전압 %minV 최대전압 %maxV",
     "Sensors03.laserRead|block": "레이저 감지됨 핀 %pin",
     "Sensors03.reedSwitchRead|block": "리드 스위치 감지됨 핀 %pin",
     "Sensors03.tiltRead|block": "기울기 감지됨 핀 %pin",
