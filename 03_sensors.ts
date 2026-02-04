@@ -2186,7 +2186,7 @@ namespace Sensors03 {
         return Math.round(voltage * 100) / 100
     }
 
-    //% block="battery level (%) pin %pin min voltage %minV max voltage %maxV"
+    //% block="battery level percent pin %pin min voltage %minV max voltage %maxV"
     //% pin.defl=AnalogPin.P0
     //% minV.defl=3.0 maxV.defl=4.2
     //% group="전압센서(Voltage Sensor)" weight=56
