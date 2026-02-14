@@ -18,7 +18,9 @@ namespace Actuators05 {
     //% group="Servo Motors" weight=82
     //% inlineInputMode=inline
     export function servoSetAngle(pin: AnalogPin, angle: number): void {
-        pins.servoWritePin(pin, angle)
+        // 설정된 범위로 클램핑
+        let clampedAngle = Math.constrain(angle, _servoMinAngle, _servoMaxAngle)
+        pins.servoWritePin(pin, clampedAngle)
     }
 
     //% block="servo %pin continuous servo rotation speed %speed \\% set to"
@@ -27,16 +29,24 @@ namespace Actuators05 {
     //% inlineInputMode=inline
     export function servoSetSpeed(pin: AnalogPin, speed: number): void {
         // -100~100을 0~180으로 변환 (90이 정지)
-        let angle = Math.map(speed, -100, 100, 0, 180)
-        pins.servoWritePin(pin, angle)
+        let clampedSpeed = Math.constrain(speed, -100, 100)
+        if (clampedSpeed == 0) {
+            pins.servoWritePin(pin, 90)
+        } else {
+            let angle = Math.map(clampedSpeed, -100, 100, 0, 180)
+            pins.servoWritePin(pin, angle)
+        }
     }
 
     //% block="servo %pin stop"
     //% group="Servo Motors" weight=80
     export function servoStop(pin: AnalogPin): void {
-        pins.servoWritePin(pin, 90)
         if (_servoNeutralStop) {
-            pins.servoSetPulse(pin, 0)
+            // PWM 신호를 완전히 해제하여 서보 정지
+            pins.digitalWritePin(<any>pin, 0)
+        } else {
+            // 90도(중립) 위치로 이동
+            pins.servoWritePin(pin, 90)
         }
     }
 
@@ -47,13 +57,18 @@ namespace Actuators05 {
         _servoNeutralStop = enable
     }
 
+    // 서보 범위 제한 변수
+    let _servoMinAngle: number = 0
+    let _servoMaxAngle: number = 180
+
     //% block="servo servo %pin 's angle %minAngle from %maxAngle through rangeset to"
     //% minAngle.defl=0 maxAngle.defl=180
     //% group="Servo Motors" weight=78
     //% inlineInputMode=inline
     export function servoSetRange(pin: AnalogPin, minAngle: number, maxAngle: number): void {
-        // 범위 제한 설정 (MakeCode 내부 사용)
-        pins.servoSetPulse(pin, Math.map(minAngle, 0, 180, 500, 2500))
+        // 범위 값 저장 (servoSetAngle에서 클램핑에 사용)
+        _servoMinAngle = Math.min(minAngle, maxAngle)
+        _servoMaxAngle = Math.max(minAngle, maxAngle)
     }
 
     //% block="servo %pin servo's pulse %pulse (μs) set to"
@@ -61,7 +76,9 @@ namespace Actuators05 {
     //% group="Servo Motors" weight=77
     //% inlineInputMode=inline
     export function servoSetPulse(pin: AnalogPin, pulse: number): void {
-        pins.servoSetPulse(pin, pulse)
+        // 유효 펄스 범위로 클램핑 (0은 허용하지 않음)
+        let clampedPulse = Math.constrain(pulse, 500, 2500)
+        pins.servoSetPulse(pin, clampedPulse)
     }
 
     /**
@@ -129,7 +146,8 @@ namespace Actuators05 {
     //% inlineInputMode=inline
     export function geekservo360SetAngle(pin: AnalogPin, angle: number): void {
         // Convert 0-360 degrees to 500-2500μs
-        let pulse = Math.map(angle, 0, 360, 500, 2500)
+        let clampedAngle = Math.constrain(angle, 0, 360)
+        let pulse = Math.map(clampedAngle, 0, 360, 500, 2500)
         pins.servoSetPulse(pin, pulse)
     }
 
@@ -147,14 +165,15 @@ namespace Actuators05 {
     //% inlineInputMode=inline
     export function geekservoWheel(pin: AnalogPin, speed: number, direction: GeekservoDirection): void {
         // Geekservo continuous rotation: 1500μs = stop, 500μs = max CCW, 2500μs = max CW
+        let clampedSpeed = Math.constrain(speed, 0, 100)
         let pulse = 1500
-        if (speed > 0) {
+        if (clampedSpeed > 0) {
             if (direction == GeekservoDirection.Forward) {
                 // Clockwise: 1500 -> 2500
-                pulse = Math.map(speed, 0, 100, 1500, 2500)
+                pulse = Math.map(clampedSpeed, 0, 100, 1500, 2500)
             } else {
                 // Counter-clockwise: 1500 -> 500
-                pulse = Math.map(speed, 0, 100, 1500, 500)
+                pulse = Math.map(clampedSpeed, 0, 100, 1500, 500)
             }
         }
         pins.servoSetPulse(pin, pulse)
@@ -269,8 +288,10 @@ namespace Actuators05 {
     //% group="Servo Driver(PCA9685)" weight=59
     //% inlineInputMode=inline
     export function pca9685SetAngle(index: number, channel: number, angle: number): void {
+        if (!_pca9685Initialized[index - 1]) return
         // Convert angle to pulse width (500-2500μs for 0-180°)
-        let pulseWidth = Math.map(angle, 0, 180, 500, 2500)
+        let clampedAngle = Math.constrain(angle, 0, 180)
+        let pulseWidth = Math.map(clampedAngle, 0, 180, 500, 2500)
         // Convert to PWM value (at 50Hz, 1 cycle = 20000μs, 4096 steps)
         let pwmValue = Math.round(pulseWidth * 4096 / (1000000 / _pca9685Freq[index - 1]))
         pca9685SetPWM(index, channel, 0, pwmValue)
@@ -289,8 +310,10 @@ namespace Actuators05 {
     //% group="Servo Driver(PCA9685)" weight=58
     //% inlineInputMode=inline
     export function pca9685SetPulse(index: number, channel: number, pulse: number): void {
+        if (!_pca9685Initialized[index - 1]) return
         // Convert to PWM value
-        let pwmValue = Math.round(pulse * 4096 / (1000000 / _pca9685Freq[index - 1]))
+        let clampedPulse = Math.constrain(pulse, 500, 2500)
+        let pwmValue = Math.round(clampedPulse * 4096 / (1000000 / _pca9685Freq[index - 1]))
         pca9685SetPWM(index, channel, 0, pwmValue)
     }
 
@@ -326,13 +349,17 @@ namespace Actuators05 {
     //% inlineInputMode=inline
     export function pca9685SetPWM(index: number, channel: number, on: number, off: number): void {
         let i = index - 1
-        let reg = 0x06 + channel * 4
+        if (i < 0 || i >= 8 || !_pca9685Initialized[i]) return
+        let clampedChannel = Math.constrain(channel, 0, 15)
+        let clampedOn = Math.constrain(on, 0, 4095)
+        let clampedOff = Math.constrain(off, 0, 4095)
+        let reg = 0x06 + clampedChannel * 4
         let buf = pins.createBuffer(5)
         buf[0] = reg
-        buf[1] = on & 0xFF
-        buf[2] = (on >> 8) & 0xFF
-        buf[3] = off & 0xFF
-        buf[4] = (off >> 8) & 0xFF
+        buf[1] = clampedOn & 0xFF
+        buf[2] = (clampedOn >> 8) & 0xFF
+        buf[3] = clampedOff & 0xFF
+        buf[4] = (clampedOff >> 8) & 0xFF
         pins.i2cWriteBuffer(_pca9685Addr[i], buf)
     }
 
@@ -766,7 +793,9 @@ namespace Actuators05 {
     //% inlineInputMode=inline
     export function l9110Run(motor: number, speed: number, direction: L9110Direction): void {
         let i = motor - 1
-        let pwm = Math.map(speed, 0, 255, 0, 1023)
+        if (i < 0 || i >= 4) return
+        let clampedSpeed = Math.constrain(speed, 0, 255)
+        let pwm = Math.map(clampedSpeed, 0, 255, 0, 1023)
 
         if (direction == L9110Direction.Clockwise) {
             pins.analogWritePin(_l9110PinA[i], pwm)
@@ -1147,7 +1176,8 @@ namespace Actuators05 {
     //% speed.min=0 speed.max=100 speed.defl=50
     //% group="Fan모터" weight=57
     export function fanSpeed(speed: number): void {
-        pins.analogWritePin(_fanPin, speed * 10.23)
+        let clampedSpeed = Math.constrain(speed, 0, 100)
+        pins.analogWritePin(_fanPin, clampedSpeed * 10.23)
     }
 
 
