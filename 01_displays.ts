@@ -432,25 +432,23 @@ namespace Displays01 {
 
     // NeoPixel 색상 프리셋
     export enum NeoPixelColors {
-        //% block="red"
+        //% block="빨강"
         Red = 0xFF0000,
-        //% block="orange"
+        //% block="주황"
         Orange = 0xFFA500,
-        //% block="yellow"
+        //% block="노랑"
         Yellow = 0xFFFF00,
-        //% block="green"
+        //% block="초록"
         Green = 0x00FF00,
-        //% block="blue"
+        //% block="파랑"
         Blue = 0x0000FF,
-        //% block="indigo"
+        //% block="남색"
         Indigo = 0x4B0082,
-        //% block="purple"
-        Violet = 0x8A2BE2,
-        //% block="violet"
+        //% block="보라"
         Purple = 0xFF00FF,
-        //% block="white"
+        //% block="흰색"
         White = 0xFFFFFF,
-        //% block="black"
+        //% block="검정"
         Black = 0x000000
     }
 
@@ -599,11 +597,11 @@ namespace Displays01 {
 
     //% block="%strip|range start %start|count %length set to"
     //% strip.shadow="variables_get" strip.defl="strip"
-    //% start.defl=0 length.defl=4
+    //% start.defl=1 start.min=1 length.defl=4
     //% group="네오픽셀(NeoPixel)" weight=99
     //% blockSetVariable=range
     export function neopixelRange(strip: NeoPixelStrip, start: number, length: number): NeoPixelStrip {
-        return strip.range(start, length)
+        return strip.range(start - 1, length)
     }
 
     //% block="%strip|rainbow show color %startHue from %endHue to"
@@ -671,9 +669,10 @@ namespace Displays01 {
     //% block="%strip|pixel %index at color %color set"
     //% strip.shadow="variables_get" strip.defl="strip"
     //% color.shadow="neopixelColorPicker"
+    //% index.defl=1 index.min=1
     //% group="네오픽셀(NeoPixel)" weight=90
     export function neopixelSetPixelColor(strip: NeoPixelStrip, index: number, color: number): void {
-        strip.setPixelColor(index, color)
+        strip.setPixelColor(index - 1, color)
     }
 
     //% block="HSL color H %h|S %s|L %l"
@@ -718,7 +717,7 @@ namespace Displays01 {
     //% blockId="neopixelColorPicker"
     //% shim=TD_ID
     //% color.fieldEditor="colorwheel"
-    //% color.fieldOptions.colours='["#ff0000","#ffa500","#ffff00","#00ff00","#00ffff","#0000ff","#ff00ff","#ffffff","#000000"]'
+    //% color.fieldOptions.colours='["#ff0000","#ffa500","#ffff00","#00ff00","#0000ff","#4b0082","#ff00ff","#ffffff","#000000"]'
     //% color.fieldOptions.columns=3
     //% color.defl=0xff0000
     //% group="네오픽셀(NeoPixel)" weight=88
@@ -727,7 +726,7 @@ namespace Displays01 {
         return color
     }
 
-    //% block="color %color"
+    //% block="색상 %color"
     //% group="네오픽셀(NeoPixel)" weight=88
     export function neopixelPresetColor(color: NeoPixelColors): number {
         return color
