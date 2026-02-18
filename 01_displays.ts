@@ -614,7 +614,7 @@ namespace Displays01 {
 
     //% block="%strip|color %color show"
     //% strip.shadow="variables_get" strip.defl="strip"
-    //% color.shadow="neopixelColorPicker"
+    //% color.shadow="neopixelPresetColorPicker"
     //% group="네오픽셀(NeoPixel)" weight=97
     export function neopixelShowColor(strip: NeoPixelStrip, color: number): void {
         strip.showColor(color)
@@ -668,7 +668,7 @@ namespace Displays01 {
 
     //% block="%strip|pixel %index at color %color set"
     //% strip.shadow="variables_get" strip.defl="strip"
-    //% color.shadow="neopixelColorPicker"
+    //% color.shadow="neopixelPresetColorPicker"
     //% index.defl=1 index.min=1
     //% group="네오픽셀(NeoPixel)" weight=90
     export function neopixelSetPixelColor(strip: NeoPixelStrip, index: number, color: number): void {
@@ -727,7 +727,10 @@ namespace Displays01 {
     }
 
     //% block="색상 %color"
+    //% blockId="neopixelPresetColorPicker"
+    //% shim=TD_ID
     //% group="네오픽셀(NeoPixel)" weight=88
+    //% blockHidden=true
     export function neopixelPresetColor(color: NeoPixelColors): number {
         return color
     }
