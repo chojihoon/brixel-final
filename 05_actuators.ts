@@ -4,820 +4,8 @@
  */
 
 //% weight=1060 color=#50B91A icon="\uf013" block="05. Actuators"
-//% groups="['Servo Motors', 'Servo Driver(PCA9685)', 'Stepper Motors', 'DC모터(L9110)', 'DC모터(L298N)', 'DC모터(L293D)', '듀얼 H-브리지 모터(TB6612FNG)', '듀얼 H-브리지 DC 모터(DRV8833)', 'Relays', 'Solenoid', 'Fan모터', 'Pump모터']"
+//% groups="['Servo Motors', '5Kg GeekServo', 'Green GeekServo', 'Stepper Motors', 'DC모터(L298N)', 'DC모터(L293D)', '듀얼 H-브리지 모터(TB6612FNG)', '듀얼 H-브리지 DC 모터(DRV8833)', 'DC모터 드라이버(PCA9685)', 'Relays', 'Solenoid', 'Fan모터', 'Pump모터']"
 namespace Actuators05 {
-
-
-    /********** MG996R 서보 모터 **********/
-
-    // 서보 통합 구현
-    let _servoNeutralStop: boolean = false
-
-    //% block="servo %pin servo's angle %angle (°) set to"
-    //% angle.min=0 angle.max=180 angle.defl=90
-    //% group="Servo Motors" weight=82
-    //% inlineInputMode=inline
-    export function servoSetAngle(pin: AnalogPin, angle: number): void {
-        // 설정된 범위로 클램핑
-        let clampedAngle = Math.constrain(angle, _servoMinAngle, _servoMaxAngle)
-        pins.servoWritePin(pin, clampedAngle)
-    }
-
-    //% block="servo %pin continuous servo rotation speed %speed \\% set to"
-    //% speed.min=-100 speed.max=100 speed.defl=50
-    //% group="Servo Motors" weight=81
-    //% inlineInputMode=inline
-    export function servoSetSpeed(pin: AnalogPin, speed: number): void {
-        // -100~100을 0~180으로 변환 (90이 정지)
-        let clampedSpeed = Math.constrain(speed, -100, 100)
-        if (clampedSpeed == 0) {
-            pins.servoWritePin(pin, 90)
-        } else {
-            let angle = Math.map(clampedSpeed, -100, 100, 0, 180)
-            pins.servoWritePin(pin, angle)
-        }
-    }
-
-    //% block="servo %pin stop"
-    //% group="Servo Motors" weight=80
-    export function servoStop(pin: AnalogPin): void {
-        if (_servoNeutralStop) {
-            // PWM 신호를 완전히 해제하여 서보 정지
-            pins.digitalWritePin(<any>pin, 0)
-        } else {
-            // 90도(중립) 위치로 이동
-            pins.servoWritePin(pin, 90)
-        }
-    }
-
-    //% block="set servo %pin stop on neutral %enable"
-    //% enable.shadow="toggleOnOff" enable.defl=false
-    //% group="Servo Motors" weight=79
-    export function servoSetNeutralStop(pin: AnalogPin, enable: boolean): void {
-        _servoNeutralStop = enable
-    }
-
-    // 서보 범위 제한 변수
-    let _servoMinAngle: number = 0
-    let _servoMaxAngle: number = 180
-
-    //% block="servo servo %pin 's angle %minAngle from %maxAngle through rangeset to"
-    //% minAngle.defl=0 maxAngle.defl=180
-    //% group="Servo Motors" weight=78
-    //% inlineInputMode=inline
-    export function servoSetRange(pin: AnalogPin, minAngle: number, maxAngle: number): void {
-        // 범위 값 저장 (servoSetAngle에서 클램핑에 사용)
-        _servoMinAngle = Math.min(minAngle, maxAngle)
-        _servoMaxAngle = Math.max(minAngle, maxAngle)
-    }
-
-    //% block="servo %pin servo's pulse %pulse (μs) set to"
-    //% pulse.defl=1500
-    //% group="Servo Motors" weight=77
-    //% inlineInputMode=inline
-    export function servoSetPulse(pin: AnalogPin, pulse: number): void {
-        // 유효 펄스 범위로 클램핑 (0은 허용하지 않음)
-        let clampedPulse = Math.constrain(pulse, 500, 2500)
-        pins.servoSetPulse(pin, clampedPulse)
-    }
-
-    /**
-     * Servo Read Angle (for analog feedback servo)
-     * @param pin Feedback pin
-     */
-    //% block="Servo Pin $pin Read Angle"
-    //% pin.defl=AnalogPin.P0
-    //% group="Servo Motors" weight=76
-    export function servoReadAngle(pin: AnalogPin): number {
-        // Read analog value (0-1023)
-        let raw = pins.analogReadPin(pin)
-        // Convert 0-1023 to 0-180 degrees
-        return Math.round(Math.map(raw, 0, 1023, 0, 180))
-    }
-
-    /**
-     * Servo Read Microseconds (for analog feedback servo)
-     * @param pin Feedback pin
-     */
-    //% block="Servo Pin $pin Read Micros"
-    //% pin.defl=AnalogPin.P0
-    //% group="Servo Motors" weight=75
-    export function servoReadMicros(pin: AnalogPin): number {
-        // Read analog value (0-1023)
-        let raw = pins.analogReadPin(pin)
-        // Convert 0-1023 to 500-2500μs
-        return Math.round(Math.map(raw, 0, 1023, 500, 2500))
-    }
-
-    /**
-     * Servo Is Connected
-     * @param pin Feedback pin
-     */
-    //% block="Servo Pin $pin Connected?"
-    //% pin.defl=AnalogPin.P0
-    //% group="Servo Motors" weight=74
-    export function servoIsConnected(pin: AnalogPin): boolean {
-        // Read analog value
-        let raw = pins.analogReadPin(pin)
-        // If within valid range, considered connected
-        return raw > 10 && raw < 1013
-    }
-
-
-    /********** Geekservo **********/
-
-    // Geekservo Direction
-    export enum GeekservoDirection {
-        //% block="Forward (CW)"
-        Forward = 0,
-        //% block="Backward (CCW)"
-        Backward = 1
-    }
-
-    /**
-     * 360 Geekservo Set Angle
-     * @param pin Servo pin
-     * @param angle Angle (0-360)
-     */
-    //% block="360 Geekservo Pin $pin Set Angle $angle (0~360)"
-    //% pin.defl=AnalogPin.P0
-    //% angle.min=0 angle.max=360 angle.defl=0
-    //% group="Servo Motors" weight=73
-    //% inlineInputMode=inline
-    export function geekservo360SetAngle(pin: AnalogPin, angle: number): void {
-        // Convert 0-360 degrees to 500-2500μs
-        let clampedAngle = Math.constrain(angle, 0, 360)
-        let pulse = Math.map(clampedAngle, 0, 360, 500, 2500)
-        pins.servoSetPulse(pin, pulse)
-    }
-
-    /**
-     * Geekservo Wheel Mode (continuous rotation)
-     * @param pin Servo pin
-     * @param speed Speed (0-100)
-     * @param direction Direction
-     */
-    //% block="Geekservo Wheel Pin $pin Speed $speed Direction $direction"
-    //% pin.defl=AnalogPin.P0
-    //% speed.min=0 speed.max=100 speed.defl=100
-    //% direction.defl=GeekservoDirection.Forward
-    //% group="Servo Motors" weight=72
-    //% inlineInputMode=inline
-    export function geekservoWheel(pin: AnalogPin, speed: number, direction: GeekservoDirection): void {
-        // Geekservo continuous rotation: 1500μs = stop, 500μs = max CCW, 2500μs = max CW
-        let clampedSpeed = Math.constrain(speed, 0, 100)
-        let pulse = 1500
-        if (clampedSpeed > 0) {
-            if (direction == GeekservoDirection.Forward) {
-                // Clockwise: 1500 -> 2500
-                pulse = Math.map(clampedSpeed, 0, 100, 1500, 2500)
-            } else {
-                // Counter-clockwise: 1500 -> 500
-                pulse = Math.map(clampedSpeed, 0, 100, 1500, 500)
-            }
-        }
-        pins.servoSetPulse(pin, pulse)
-    }
-
-    /**
-     * Geekservo Stop
-     * @param pin Servo pin
-     */
-    //% block="Geekservo Pin $pin Stop"
-    //% pin.defl=AnalogPin.P0
-    //% group="Servo Motors" weight=71
-    export function geekservoStop(pin: AnalogPin): void {
-        pins.servoSetPulse(pin, 1500)
-    }
-
-
-    /********** PCA9685 Servo Driver **********/
-
-    // PCA9685 I2C Address
-    export enum PCA9685Address {
-        //% block="0x40"
-        Addr0x40 = 0x40,
-        //% block="0x41"
-        Addr0x41 = 0x41,
-        //% block="0x42"
-        Addr0x42 = 0x42,
-        //% block="0x43"
-        Addr0x43 = 0x43,
-        //% block="0x44"
-        Addr0x44 = 0x44,
-        //% block="0x45"
-        Addr0x45 = 0x45,
-        //% block="0x46"
-        Addr0x46 = 0x46,
-        //% block="0x47"
-        Addr0x47 = 0x47
-    }
-
-    // PCA9685 Sleep Mode
-    export enum PCA9685SleepMode {
-        //% block="Wake"
-        Wake = 0,
-        //% block="Sleep"
-        Sleep = 1
-    }
-
-    // PCA9685 Data Variables (max 8 drivers)
-    let _pca9685Addr: number[] = [0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47]
-    let _pca9685Freq: number[] = [50, 50, 50, 50, 50, 50, 50, 50]
-    let _pca9685Initialized: boolean[] = [false, false, false, false, false, false, false, false]
-
-    /**
-     * PCA9685 write register
-     */
-    function pca9685WriteReg(index: number, reg: number, value: number): void {
-        let buf = pins.createBuffer(2)
-        buf[0] = reg
-        buf[1] = value
-        pins.i2cWriteBuffer(_pca9685Addr[index - 1], buf)
-    }
-
-    /**
-     * PCA9685 Servo Driver Setup
-     * @param index Driver index (1-8)
-     * @param addr I2C address
-     * @param freq PWM frequency in Hz
-     */
-    //% block="Servo Driver(PCA9685) Setup $index I2C Address $addr PWM Frequency $freq Hz"
-    //% index.min=1 index.max=8 index.defl=1
-    //% addr.defl=PCA9685Address.Addr0x40
-    //% freq.min=24 freq.max=1526 freq.defl=50
-    //% group="Servo Driver(PCA9685)" weight=60
-    //% inlineInputMode=inline
-    export function pca9685Setup(index: number, addr: PCA9685Address, freq: number): void {
-        let i = index - 1
-        _pca9685Addr[i] = addr
-        _pca9685Freq[i] = freq
-
-        // Reset PCA9685
-        pca9685WriteReg(index, 0x00, 0x00)
-        basic.pause(5)
-
-        // Set sleep mode to configure frequency
-        pca9685WriteReg(index, 0x00, 0x10)
-        basic.pause(5)
-
-        // Calculate prescale value: prescale = round(25MHz / (4096 * freq)) - 1
-        let prescale = Math.round(25000000 / (4096 * freq)) - 1
-        pca9685WriteReg(index, 0xFE, prescale)
-
-        // Wake up
-        pca9685WriteReg(index, 0x00, 0x00)
-        basic.pause(5)
-
-        // Auto-increment enabled
-        pca9685WriteReg(index, 0x00, 0xA0)
-
-        _pca9685Initialized[i] = true
-    }
-
-    /**
-     * PCA9685 Set Servo Angle
-     * @param index Driver index
-     * @param channel Channel (0-15)
-     * @param angle Angle in degrees
-     */
-    //% block="Servo Driver $index Channel $channel Angle Set $angle degree"
-    //% index.min=1 index.max=8 index.defl=1
-    //% channel.min=0 channel.max=15 channel.defl=0
-    //% angle.min=0 angle.max=180 angle.defl=90
-    //% group="Servo Driver(PCA9685)" weight=59
-    //% inlineInputMode=inline
-    export function pca9685SetAngle(index: number, channel: number, angle: number): void {
-        if (!_pca9685Initialized[index - 1]) return
-        // Convert angle to pulse width (500-2500μs for 0-180°)
-        let clampedAngle = Math.constrain(angle, 0, 180)
-        let pulseWidth = Math.map(clampedAngle, 0, 180, 500, 2500)
-        // Convert to PWM value (at 50Hz, 1 cycle = 20000μs, 4096 steps)
-        let pwmValue = Math.round(pulseWidth * 4096 / (1000000 / _pca9685Freq[index - 1]))
-        pca9685SetPWM(index, channel, 0, pwmValue)
-    }
-
-    /**
-     * PCA9685 Set Servo Pulse
-     * @param index Driver index
-     * @param channel Channel (0-15)
-     * @param pulse Pulse width in microseconds
-     */
-    //% block="Servo Driver $index Channel $channel Pulse Set $pulse Microseconds"
-    //% index.min=1 index.max=8 index.defl=1
-    //% channel.min=0 channel.max=15 channel.defl=0
-    //% pulse.defl=1500
-    //% group="Servo Driver(PCA9685)" weight=58
-    //% inlineInputMode=inline
-    export function pca9685SetPulse(index: number, channel: number, pulse: number): void {
-        if (!_pca9685Initialized[index - 1]) return
-        // Convert to PWM value
-        let clampedPulse = Math.constrain(pulse, 500, 2500)
-        let pwmValue = Math.round(clampedPulse * 4096 / (1000000 / _pca9685Freq[index - 1]))
-        pca9685SetPWM(index, channel, 0, pwmValue)
-    }
-
-    /**
-     * PCA9685 Set PWM Value
-     * @param index Driver index
-     * @param channel Channel (0-15)
-     * @param value PWM value (0-4095)
-     */
-    //% block="Servo Driver $index Channel $channel PWM Value $value (0-4095)"
-    //% index.min=1 index.max=8 index.defl=1
-    //% channel.min=0 channel.max=15 channel.defl=0
-    //% value.min=0 value.max=4095 value.defl=2048
-    //% group="Servo Driver(PCA9685)" weight=57
-    //% inlineInputMode=inline
-    export function pca9685SetPWMValue(index: number, channel: number, value: number): void {
-        pca9685SetPWM(index, channel, 0, value)
-    }
-
-    /**
-     * PCA9685 Set PWM On/Off
-     * @param index Driver index
-     * @param channel Channel (0-15)
-     * @param on On time (0-4095)
-     * @param off Off time (0-4095)
-     */
-    //% block="Servo Driver $index Channel $channel PWM On $on Off $off"
-    //% index.min=1 index.max=8 index.defl=1
-    //% channel.min=0 channel.max=15 channel.defl=0
-    //% on.min=0 on.max=4095 on.defl=0
-    //% off.min=0 off.max=4095 off.defl=2048
-    //% group="Servo Driver(PCA9685)" weight=56
-    //% inlineInputMode=inline
-    export function pca9685SetPWM(index: number, channel: number, on: number, off: number): void {
-        let i = index - 1
-        if (i < 0 || i >= 8 || !_pca9685Initialized[i]) return
-        let clampedChannel = Math.constrain(channel, 0, 15)
-        let clampedOn = Math.constrain(on, 0, 4095)
-        let clampedOff = Math.constrain(off, 0, 4095)
-        let reg = 0x06 + clampedChannel * 4
-        let buf = pins.createBuffer(5)
-        buf[0] = reg
-        buf[1] = clampedOn & 0xFF
-        buf[2] = (clampedOn >> 8) & 0xFF
-        buf[3] = clampedOff & 0xFF
-        buf[4] = (clampedOff >> 8) & 0xFF
-        pins.i2cWriteBuffer(_pca9685Addr[i], buf)
-    }
-
-    /**
-     * PCA9685 Sleep/Wake
-     * @param index Driver index
-     * @param mode Sleep mode
-     */
-    //% block="Servo Driver $index $mode"
-    //% index.min=1 index.max=8 index.defl=1
-    //% mode.defl=PCA9685SleepMode.Wake
-    //% group="Servo Driver(PCA9685)" weight=55
-    export function pca9685Sleep(index: number, mode: PCA9685SleepMode): void {
-        if (mode == PCA9685SleepMode.Sleep) {
-            pca9685WriteReg(index, 0x00, 0x10)
-        } else {
-            pca9685WriteReg(index, 0x00, 0xA0)
-        }
-    }
-
-    /**
-     * PCA9685 Set Multiple Servos
-     * @param index Driver index
-     * @param ch1 Channel 1 angle
-     * @param ch2 Channel 2 angle
-     * @param ch3 Channel 3 angle
-     * @param ch4 Channel 4 angle
-     */
-    //% block="Servo Driver $index Multi Servo Set Ch1 $ch1 ° Ch2 $ch2 ° Ch3 $ch3 ° Ch4 $ch4 °"
-    //% index.min=1 index.max=8 index.defl=1
-    //% ch1.min=0 ch1.max=180 ch1.defl=90
-    //% ch2.min=0 ch2.max=180 ch2.defl=90
-    //% ch3.min=0 ch3.max=180 ch3.defl=90
-    //% ch4.min=0 ch4.max=180 ch4.defl=90
-    //% group="Servo Driver(PCA9685)" weight=54
-    //% inlineInputMode=inline
-    export function pca9685SetMultiServo(index: number, ch1: number, ch2: number, ch3: number, ch4: number): void {
-        pca9685SetAngle(index, 0, ch1)
-        pca9685SetAngle(index, 1, ch2)
-        pca9685SetAngle(index, 2, ch3)
-        pca9685SetAngle(index, 3, ch4)
-    }
-
-    /**
-     * PCA9685 Set LED Brightness
-     * @param index Driver index
-     * @param channel Channel (0-15)
-     * @param brightness Brightness (0-100%)
-     */
-    //% block="Servo Driver $index Channel $channel LED Brightness $brightness \\%"
-    //% index.min=1 index.max=8 index.defl=1
-    //% channel.min=0 channel.max=15 channel.defl=0
-    //% brightness.min=0 brightness.max=100 brightness.defl=50
-    //% group="Servo Driver(PCA9685)" weight=53
-    //% inlineInputMode=inline
-    export function pca9685SetLED(index: number, channel: number, brightness: number): void {
-        let pwmValue = Math.round(brightness * 4095 / 100)
-        pca9685SetPWM(index, channel, 0, pwmValue)
-    }
-
-
-    /********** NEMA17 스테퍼 모터 **********/
-
-    // 스테퍼 드라이버 타입
-    export enum StepperDriver {
-        //% block="Driver(2pin)"
-        Driver2Pin = 0,
-        //% block="ULN2003(4pin)"
-        ULN2003 = 1
-    }
-
-    // 스테퍼 이동 타입
-    export enum StepperMoveType {
-        //% block="Move to Absolute"
-        Absolute = 0,
-        //% block="Move to Relative"
-        Relative = 1
-    }
-
-    // 스테퍼 동작
-    export enum StepperAction {
-        //% block="Run"
-        Run = 0,
-        //% block="Stop"
-        Stop = 1
-    }
-
-    // 스테퍼 상태
-    export enum StepperStatus {
-        //% block="Current Position"
-        Position = 0,
-        //% block="Running"
-        Running = 1
-    }
-
-    // 스테퍼 모터 데이터 (최대 4개)
-    let _stepperDirPin: DigitalPin[] = [DigitalPin.P0, DigitalPin.P0, DigitalPin.P0, DigitalPin.P0]
-    let _stepperStepPin: DigitalPin[] = [DigitalPin.P1, DigitalPin.P1, DigitalPin.P1, DigitalPin.P1]
-    let _stepperMaxSpeed: number[] = [1000, 1000, 1000, 1000]
-    let _stepperAccel: number[] = [50, 50, 50, 50]
-    let _stepperSpeed: number[] = [200, 200, 200, 200]
-    let _stepperSteps: number[] = [200, 200, 200, 200]
-    let _stepperPosition: number[] = [0, 0, 0, 0]
-    let _stepperTarget: number[] = [0, 0, 0, 0]
-    let _stepperRunning: boolean[] = [false, false, false, false]
-
-    //% block="Stepper Motor(A4988) Driver( $index ) $driver : DIR Pin $dirPin , Step Pin $stepPin Setup"
-    //% index.min=1 index.max=4 index.defl=1
-    //% dirPin.defl=DigitalPin.P8
-    //% stepPin.defl=DigitalPin.P9
-    //% group="Stepper Motors" weight=76
-    //% inlineInputMode=inline
-    export function stepperSetup(index: number, driver: StepperDriver, dirPin: DigitalPin, stepPin: DigitalPin): void {
-        let i = index - 1
-        _stepperDirPin[i] = dirPin
-        _stepperStepPin[i] = stepPin
-    }
-
-    //% block="Stepper Motor $index : Max Speed $maxSpeed , Acceleration $accel , Speed Set $speed , Step Set $steps"
-    //% index.min=1 index.max=4 index.defl=1
-    //% maxSpeed.defl=1000 accel.defl=50 speed.defl=200 steps.defl=200
-    //% group="Stepper Motors" weight=75
-    //% inlineInputMode=inline
-    export function stepperConfig(index: number, maxSpeed: number, accel: number, speed: number, steps: number): void {
-        let i = index - 1
-        _stepperMaxSpeed[i] = maxSpeed
-        _stepperAccel[i] = accel
-        _stepperSpeed[i] = speed
-        _stepperSteps[i] = steps
-    }
-
-    //% block="Stepper Motor $index : $moveType $position"
-    //% index.min=1 index.max=4 index.defl=1
-    //% position.defl=200
-    //% group="Stepper Motors" weight=74
-    //% inlineInputMode=inline
-    export function stepperMove(index: number, moveType: StepperMoveType, position: number): void {
-        let i = index - 1
-        if (moveType == StepperMoveType.Absolute) {
-            _stepperTarget[i] = position
-        } else {
-            _stepperTarget[i] = _stepperPosition[i] + position
-        }
-    }
-
-    //% block="Stepper Motor $index : $action"
-    //% index.min=1 index.max=4 index.defl=1
-    //% group="Stepper Motors" weight=73
-    export function stepperAction(index: number, action: StepperAction): void {
-        let i = index - 1
-        if (action == StepperAction.Run) {
-            _stepperRunning[i] = true
-            let steps = _stepperTarget[i] - _stepperPosition[i]
-            let dir = steps > 0 ? 1 : 0
-            pins.digitalWritePin(_stepperDirPin[i], dir)
-
-            let delay = Math.floor(1000000 / _stepperSpeed[i] / 2)
-            for (let s = 0; s < Math.abs(steps); s++) {
-                if (!_stepperRunning[i]) break
-                pins.digitalWritePin(_stepperStepPin[i], 1)
-                control.waitMicros(delay)
-                pins.digitalWritePin(_stepperStepPin[i], 0)
-                control.waitMicros(delay)
-                _stepperPosition[i] += dir ? 1 : -1
-            }
-            _stepperRunning[i] = false
-        } else {
-            _stepperRunning[i] = false
-        }
-    }
-
-    //% block="Stepper Motor $index : $status"
-    //% index.min=1 index.max=4 index.defl=1
-    //% group="Stepper Motors" weight=72
-    export function stepperGetStatus(index: number, status: StepperStatus): number {
-        let i = index - 1
-        if (status == StepperStatus.Position) {
-            return _stepperPosition[i]
-        }
-        return _stepperRunning[i] ? 1 : 0
-    }
-
-
-    /********** 28BYJ-48 Stepper Motor (4-pin ULN2003) **********/
-
-    // 28BYJ-48 Motor Type
-    export enum Stepper28BYJType {
-        //% block="28BYJ-48"
-        BYJ48 = 0,
-        //% block="ULN2003"
-        ULN2003 = 1,
-        //% block="Custom"
-        Custom = 2
-    }
-
-    // 28BYJ-48 Pin Mode
-    export enum Stepper28BYJPinMode {
-        //% block="4pin"
-        Pin4 = 0,
-        //% block="2pin"
-        Pin2 = 1
-    }
-
-    // 28BYJ-48 Move Unit
-    export enum Stepper28BYJUnit {
-        //% block="Step"
-        Step = 0,
-        //% block="Degree"
-        Degree = 1,
-        //% block="Revolution"
-        Revolution = 2
-    }
-
-    // 28BYJ-48 Data Variables (max 4 motors)
-    let _28byj_in1: DigitalPin[] = [DigitalPin.P8, DigitalPin.P8, DigitalPin.P8, DigitalPin.P8]
-    let _28byj_in2: DigitalPin[] = [DigitalPin.P9, DigitalPin.P9, DigitalPin.P9, DigitalPin.P9]
-    let _28byj_in3: DigitalPin[] = [DigitalPin.P10, DigitalPin.P10, DigitalPin.P10, DigitalPin.P10]
-    let _28byj_in4: DigitalPin[] = [DigitalPin.P11, DigitalPin.P11, DigitalPin.P11, DigitalPin.P11]
-    let _28byj_rpm: number[] = [10, 10, 10, 10]
-    let _28byj_position: number[] = [0, 0, 0, 0]
-    let _28byj_target: number[] = [0, 0, 0, 0]
-    let _28byj_stepsPerRev: number = 2048  // 28BYJ-48 steps per revolution
-
-    // Half-step sequence for 28BYJ-48
-    const _28byj_sequence: number[][] = [
-        [1, 0, 0, 0],
-        [1, 1, 0, 0],
-        [0, 1, 0, 0],
-        [0, 1, 1, 0],
-        [0, 0, 1, 0],
-        [0, 0, 1, 1],
-        [0, 0, 0, 1],
-        [1, 0, 0, 1]
-    ]
-
-    /**
-     * 28BYJ-48 Stepper Motor Setup (4-pin)
-     * @param motorType Motor type
-     * @param index Motor index (1-4)
-     * @param pinMode Pin mode
-     * @param in1 IN1 pin
-     * @param in2 IN2 pin
-     * @param in3 IN3 pin
-     * @param in4 IN4 pin
-     */
-    //% block="Stepper Motor( $motorType & $index ) $pinMode Connection Pin: IN1 $in1 IN2 $in2 IN3 $in3 IN4 $in4"
-    //% motorType.defl=Stepper28BYJType.BYJ48
-    //% index.min=1 index.max=4 index.defl=1
-    //% pinMode.defl=Stepper28BYJPinMode.Pin4
-    //% in1.defl=DigitalPin.P8
-    //% in2.defl=DigitalPin.P9
-    //% in3.defl=DigitalPin.P10
-    //% in4.defl=DigitalPin.P11
-    //% group="Stepper Motors" weight=69
-    //% inlineInputMode=inline
-    export function stepper28BYJSetup(motorType: Stepper28BYJType, index: number, pinMode: Stepper28BYJPinMode, in1: DigitalPin, in2: DigitalPin, in3: DigitalPin, in4: DigitalPin): void {
-        let i = index - 1
-        _28byj_in1[i] = in1
-        _28byj_in2[i] = in2
-        _28byj_in3[i] = in3
-        _28byj_in4[i] = in4
-    }
-
-    /**
-     * 28BYJ-48 Set RPM
-     * @param index Motor index
-     * @param rpm Speed in RPM
-     */
-    //% block="Stepper Motor $index : Rotation Speed $rpm RPM"
-    //% index.min=1 index.max=4 index.defl=1
-    //% rpm.min=1 rpm.max=15 rpm.defl=10
-    //% group="Stepper Motors" weight=68
-    export function stepper28BYJSetRPM(index: number, rpm: number): void {
-        let i = index - 1
-        _28byj_rpm[i] = rpm
-    }
-
-    /**
-     * 28BYJ-48 Set Move Target
-     * @param index Motor index
-     * @param unit Move unit
-     * @param value Move value
-     */
-    //% block="Stepper Motor $index : $unit by $value Move Set"
-    //% index.min=1 index.max=4 index.defl=1
-    //% unit.defl=Stepper28BYJUnit.Step
-    //% value.defl=35
-    //% group="Stepper Motors" weight=67
-    //% inlineInputMode=inline
-    export function stepper28BYJSetMove(index: number, unit: Stepper28BYJUnit, value: number): void {
-        let i = index - 1
-        let steps = value
-
-        if (unit == Stepper28BYJUnit.Degree) {
-            steps = Math.round(value * _28byj_stepsPerRev / 360)
-        } else if (unit == Stepper28BYJUnit.Revolution) {
-            steps = Math.round(value * _28byj_stepsPerRev)
-        }
-
-        _28byj_target[i] = _28byj_position[i] + steps
-    }
-
-    /**
-     * 28BYJ-48 Move Motor
-     * @param index Motor index
-     */
-    //% block="Stepper Motor $index : Move"
-    //% index.min=1 index.max=4 index.defl=1
-    //% group="Stepper Motors" weight=66
-    export function stepper28BYJMove(index: number): void {
-        let i = index - 1
-        let stepsToMove = _28byj_target[i] - _28byj_position[i]
-        let direction = stepsToMove > 0 ? 1 : -1
-        stepsToMove = Math.abs(stepsToMove)
-
-        // Calculate delay based on RPM
-        // 28BYJ-48: 2048 steps/rev, delay = 60000000 / (rpm * 2048 * 8) microseconds
-        let delayUs = Math.floor(60000000 / (_28byj_rpm[i] * _28byj_stepsPerRev))
-
-        let seqIndex = 0
-        for (let s = 0; s < stepsToMove; s++) {
-            // Set pins according to sequence
-            pins.digitalWritePin(_28byj_in1[i], _28byj_sequence[seqIndex][0])
-            pins.digitalWritePin(_28byj_in2[i], _28byj_sequence[seqIndex][1])
-            pins.digitalWritePin(_28byj_in3[i], _28byj_sequence[seqIndex][2])
-            pins.digitalWritePin(_28byj_in4[i], _28byj_sequence[seqIndex][3])
-
-            // Next sequence step
-            if (direction > 0) {
-                seqIndex = (seqIndex + 1) % 8
-            } else {
-                seqIndex = (seqIndex + 7) % 8
-            }
-
-            _28byj_position[i] += direction
-
-            control.waitMicros(delayUs)
-        }
-
-        // Turn off all coils
-        pins.digitalWritePin(_28byj_in1[i], 0)
-        pins.digitalWritePin(_28byj_in2[i], 0)
-        pins.digitalWritePin(_28byj_in3[i], 0)
-        pins.digitalWritePin(_28byj_in4[i], 0)
-    }
-
-    /**
-     * 28BYJ-48 Stop Motor
-     * @param index Motor index
-     */
-    //% block="Stepper Motor $index : Stop"
-    //% index.min=1 index.max=4 index.defl=1
-    //% group="Stepper Motors" weight=65
-    export function stepper28BYJStop(index: number): void {
-        let i = index - 1
-        pins.digitalWritePin(_28byj_in1[i], 0)
-        pins.digitalWritePin(_28byj_in2[i], 0)
-        pins.digitalWritePin(_28byj_in3[i], 0)
-        pins.digitalWritePin(_28byj_in4[i], 0)
-        _28byj_target[i] = _28byj_position[i]
-    }
-
-    /**
-     * 28BYJ-48 Get Position
-     * @param index Motor index
-     */
-    //% block="Stepper Motor $index : Position"
-    //% index.min=1 index.max=4 index.defl=1
-    //% group="Stepper Motors" weight=64
-    export function stepper28BYJGetPosition(index: number): number {
-        return _28byj_position[index - 1]
-    }
-
-    /**
-     * 28BYJ-48 Reset Position
-     * @param index Motor index
-     */
-    //% block="Stepper Motor $index : Reset Position"
-    //% index.min=1 index.max=4 index.defl=1
-    //% group="Stepper Motors" weight=63
-    export function stepper28BYJResetPosition(index: number): void {
-        let i = index - 1
-        _28byj_position[i] = 0
-        _28byj_target[i] = 0
-    }
-
-
-    /********** L9110 모터 드라이버 **********/
-
-    // L9110 방향
-    export enum L9110Direction {
-        //% block="Clockwise"
-        Clockwise = 0,
-        //% block="Counter Clockwise"
-        CounterClockwise = 1
-    }
-
-    // L9110 핀 저장 변수 (최대 4개 모터)
-    let _l9110PinA: AnalogPin[] = [AnalogPin.P0, AnalogPin.P0, AnalogPin.P0, AnalogPin.P0]
-    let _l9110PinB: AnalogPin[] = [AnalogPin.P1, AnalogPin.P1, AnalogPin.P1, AnalogPin.P1]
-
-    /**
-     * L9110 Motor Pin Setup
-     * @param motor Motor number (1-4)
-     * @param pinA Pin A
-     * @param pinB Pin B
-     */
-    //% block="DC Motor(L9110) $motor : Pin A $pinA , Pin B $pinB Setup"
-    //% motor.min=1 motor.max=4 motor.defl=1
-    //% pinA.defl=AnalogPin.P5
-    //% pinB.defl=AnalogPin.P6
-    //% group="DC모터(L9110)" weight=105
-    //% inlineInputMode=inline
-    export function l9110SetPins(motor: number, pinA: AnalogPin, pinB: AnalogPin): void {
-        let i = motor - 1
-        _l9110PinA[i] = pinA
-        _l9110PinB[i] = pinB
-    }
-
-    /**
-     * L9110 Motor Run
-     * @param motor Motor number (1-4)
-     * @param speed Speed (0-255)
-     * @param direction Direction
-     */
-    //% block="DC Motor $motor : Speed $speed , Direction $direction Rotate"
-    //% motor.min=1 motor.max=4 motor.defl=1
-    //% speed.min=0 speed.max=255 speed.defl=150
-    //% direction.defl=L9110Direction.Clockwise
-    //% group="DC모터(L9110)" weight=104
-    //% inlineInputMode=inline
-    export function l9110Run(motor: number, speed: number, direction: L9110Direction): void {
-        let i = motor - 1
-        if (i < 0 || i >= 4) return
-        let clampedSpeed = Math.constrain(speed, 0, 255)
-        let pwm = Math.map(clampedSpeed, 0, 255, 0, 1023)
-
-        if (direction == L9110Direction.Clockwise) {
-            pins.analogWritePin(_l9110PinA[i], pwm)
-            pins.analogWritePin(_l9110PinB[i], 0)
-        } else {
-            pins.analogWritePin(_l9110PinA[i], 0)
-            pins.analogWritePin(_l9110PinB[i], pwm)
-        }
-    }
-
-    /**
-     * L9110 Motor Stop
-     * @param motor Motor number (1-4)
-     */
-    //% block="DC Motor $motor : Stop"
-    //% motor.min=1 motor.max=4 motor.defl=1
-    //% group="DC모터(L9110)" weight=103
-    export function l9110Stop(motor: number): void {
-        let i = motor - 1
-        pins.analogWritePin(_l9110PinA[i], 0)
-        pins.analogWritePin(_l9110PinB[i], 0)
-    }
 
 
     /********** L298N 모터 드라이버 **********/
@@ -1068,6 +256,486 @@ namespace Actuators05 {
         }
     }
 
+    /********** NEMA17 스테퍼 모터 **********/
+
+    // 스테퍼 드라이버 타입
+    export enum StepperDriver {
+        //% block="driver(2pin)"
+        Driver2Pin = 0,
+        //% block="ULN2003(4pin)"
+        ULN2003 = 1
+    }
+
+    // 스테퍼 이동 타입
+    export enum StepperMoveType {
+        //% block="move to absolute position"
+        Absolute = 0,
+        //% block="move to relative position"
+        Relative = 1
+    }
+
+    // 스테퍼 동작
+    export enum StepperAction {
+        //% block="run"
+        Run = 0,
+        //% block="stop"
+        Stop = 1
+    }
+
+    // 스테퍼 상태
+    export enum StepperStatus {
+        //% block="current position"
+        Position = 0,
+        //% block="running"
+        Running = 1
+    }
+
+    // 스테퍼 모터 데이터 (최대 4개)
+    let _stepperDirPin: DigitalPin[] = [DigitalPin.P0, DigitalPin.P0, DigitalPin.P0, DigitalPin.P0]
+    let _stepperStepPin: DigitalPin[] = [DigitalPin.P1, DigitalPin.P1, DigitalPin.P1, DigitalPin.P1]
+    let _stepperMaxSpeed: number[] = [1000, 1000, 1000, 1000]
+    let _stepperAccel: number[] = [50, 50, 50, 50]
+    let _stepperSpeed: number[] = [200, 200, 200, 200]
+    let _stepperSteps: number[] = [200, 200, 200, 200]
+    let _stepperPosition: number[] = [0, 0, 0, 0]
+    let _stepperTarget: number[] = [0, 0, 0, 0]
+    let _stepperRunning: boolean[] = [false, false, false, false]
+
+    //% block="step motor(A4988) driver( %index ) driver %driver : DIRpin %dirPin . Steppin %stepPin set"
+    //% index.min=1 index.max=4 index.defl=1
+    //% group="Stepper Motors" weight=76
+    //% inlineInputMode=inline
+    export function stepperSetup(index: number, driver: StepperDriver, dirPin: DigitalPin, stepPin: DigitalPin): void {
+        let i = index - 1
+        _stepperDirPin[i] = dirPin
+        _stepperStepPin[i] = stepPin
+    }
+
+    //% block="step motor %index : max speed %maxSpeed . acceleration %accel . speed set %speed . step set %steps"
+    //% index.min=1 index.max=4 index.defl=1
+    //% maxSpeed.defl=1000 accel.defl=50 speed.defl=200 steps.defl=200
+    //% group="Stepper Motors" weight=75
+    //% inlineInputMode=inline
+    export function stepperConfig(index: number, maxSpeed: number, accel: number, speed: number, steps: number): void {
+        let i = index - 1
+        _stepperMaxSpeed[i] = maxSpeed
+        _stepperAccel[i] = accel
+        _stepperSpeed[i] = speed
+        _stepperSteps[i] = steps
+    }
+
+    //% block="step motor %index : %moveType %position"
+    //% index.min=1 index.max=4 index.defl=1
+    //% position.defl=200
+    //% group="Stepper Motors" weight=74
+    //% inlineInputMode=inline
+    export function stepperMove(index: number, moveType: StepperMoveType, position: number): void {
+        let i = index - 1
+        if (moveType == StepperMoveType.Absolute) {
+            _stepperTarget[i] = position
+        } else {
+            _stepperTarget[i] = _stepperPosition[i] + position
+        }
+    }
+
+    //% block="step motor %index : %action"
+    //% index.min=1 index.max=4 index.defl=1
+    //% group="Stepper Motors" weight=73
+    export function stepperAction(index: number, action: StepperAction): void {
+        let i = index - 1
+        if (action == StepperAction.Run) {
+            _stepperRunning[i] = true
+            let steps = _stepperTarget[i] - _stepperPosition[i]
+            let dir = steps > 0 ? 1 : 0
+            pins.digitalWritePin(_stepperDirPin[i], dir)
+
+            let delay = Math.floor(1000000 / _stepperSpeed[i] / 2)
+            for (let s = 0; s < Math.abs(steps); s++) {
+                if (!_stepperRunning[i]) break
+                pins.digitalWritePin(_stepperStepPin[i], 1)
+                control.waitMicros(delay)
+                pins.digitalWritePin(_stepperStepPin[i], 0)
+                control.waitMicros(delay)
+                _stepperPosition[i] += dir ? 1 : -1
+            }
+            _stepperRunning[i] = false
+        } else {
+            _stepperRunning[i] = false
+        }
+    }
+
+    //% block="step motor %index : %status"
+    //% index.min=1 index.max=4 index.defl=1
+    //% group="Stepper Motors" weight=72
+    export function stepperGetStatus(index: number, status: StepperStatus): number {
+        let i = index - 1
+        if (status == StepperStatus.Position) {
+            return _stepperPosition[i]
+        }
+        return _stepperRunning[i] ? 1 : 0
+    }
+
+    /********** MG996R 서보 모터 **********/
+
+    // 서보 통합 구현
+    let _servoNeutralStop: boolean = false
+
+    //% block="servo %pin servo's angle %angle (°) set to"
+    //% angle.min=0 angle.max=180 angle.defl=90
+    //% group="Servo Motors" weight=82
+    //% inlineInputMode=inline
+    export function servoSetAngle(pin: AnalogPin, angle: number): void {
+        pins.servoWritePin(pin, angle)
+    }
+
+    //% block="servo %pin continuous servo rotation speed %speed \\% set to"
+    //% speed.min=-100 speed.max=100 speed.defl=50
+    //% group="Servo Motors" weight=81
+    //% inlineInputMode=inline
+    export function servoSetSpeed(pin: AnalogPin, speed: number): void {
+        // -100~100을 0~180으로 변환 (90이 정지)
+        let angle = Math.map(speed, -100, 100, 0, 180)
+        pins.servoWritePin(pin, angle)
+    }
+
+    //% block="servo %pin stop"
+    //% group="Servo Motors" weight=80
+    export function servoStop(pin: AnalogPin): void {
+        pins.servoWritePin(pin, 90)
+        if (_servoNeutralStop) {
+            pins.servoSetPulse(pin, 0)
+        }
+    }
+
+    //% block="set servo %pin stop on neutral %enable"
+    //% enable.shadow="toggleOnOff" enable.defl=false
+    //% group="Servo Motors" weight=79
+    export function servoSetNeutralStop(pin: AnalogPin, enable: boolean): void {
+        _servoNeutralStop = enable
+    }
+
+    //% block="servo servo %pin 's angle %minAngle from %maxAngle through rangeset to"
+    //% minAngle.defl=0 maxAngle.defl=180
+    //% group="Servo Motors" weight=78
+    //% inlineInputMode=inline
+    export function servoSetRange(pin: AnalogPin, minAngle: number, maxAngle: number): void {
+        // 범위 제한 설정 (MakeCode 내부 사용)
+        pins.servoSetPulse(pin, Math.map(minAngle, 0, 180, 500, 2500))
+    }
+
+    //% block="servo %pin servo's pulse %pulse (μs) set to"
+    //% pulse.defl=1500
+    //% group="Servo Motors" weight=77
+    //% inlineInputMode=inline
+    export function servoSetPulse(pin: AnalogPin, pulse: number): void {
+        pins.servoSetPulse(pin, pulse)
+    }
+
+    /********** 5Kg GeekServo (360도 서보/DC모터 모드) **********/
+
+    // GeekServo 방향
+    export enum GeekServoDir {
+        //% block="forward (CW)"
+        CW = 0,
+        //% block="backward (CCW)"
+        CCW = 1
+    }
+
+    //% block="5Kg GeekServo setup pin %pin"
+    //% group="5Kg GeekServo" weight=60
+    export function geekServoSetup(pin: AnalogPin): void {
+        // 초기 중립 펄스 전송하여 서보 초기화
+        pins.servoSetPulse(pin, 1500)
+    }
+
+    //% block="5Kg GeekServo pin %pin set angle %degrees (0~360)"
+    //% degrees.min=0 degrees.max=360 degrees.defl=0
+    //% group="5Kg GeekServo" weight=59
+    //% inlineInputMode=inline
+    export function geekServoAngle360(pin: AnalogPin, degrees: number): void {
+        if (degrees < 0) degrees = 0
+        if (degrees > 360) degrees = 360
+
+        // 구간별 매핑 (Piecewise Mapping) - Arduino 라이브러리와 동일
+        let p0 = 500
+        let p90 = 990
+        let p180 = 1510
+        let p270 = 2020
+        let p360 = 2500
+        let us = 1500
+
+        if (degrees <= 90) {
+            us = Math.map(degrees, 0, 90, p0, p90)
+        } else if (degrees <= 180) {
+            us = Math.map(degrees, 90, 180, p90, p180)
+        } else if (degrees <= 270) {
+            us = Math.map(degrees, 180, 270, p180, p270)
+        } else {
+            us = Math.map(degrees, 270, 360, p270, p360)
+        }
+
+        pins.servoSetPulse(pin, us)
+    }
+
+    //% block="5Kg GeekServo wheel pin %pin speed %speed direction %dir"
+    //% speed.min=0 speed.max=100 speed.defl=100
+    //% group="5Kg GeekServo" weight=58
+    //% inlineInputMode=inline
+    export function geekServoWheel(pin: AnalogPin, speed: number, dir: GeekServoDir): void {
+        if (speed < 0) speed = 0
+        if (speed > 100) speed = 100
+
+        let us = 4000 // 중립 (정지)
+        if (dir == GeekServoDir.CW) {
+            us = Math.map(speed, 0, 100, 4000, 5000)
+        } else {
+            us = Math.map(speed, 0, 100, 4000, 3000)
+        }
+
+        pins.servoSetPulse(pin, us)
+    }
+
+    //% block="5Kg GeekServo wheel pin %pin speed %speed direction %dir duration %duration ms"
+    //% speed.min=0 speed.max=100 speed.defl=100
+    //% duration.defl=1000
+    //% group="5Kg GeekServo" weight=57
+    //% inlineInputMode=inline
+    export function geekServoWheelTimed(pin: AnalogPin, speed: number, dir: GeekServoDir, duration: number): void {
+        geekServoWheel(pin, speed, dir)
+        basic.pause(duration)
+        geekServoWheel(pin, 0, GeekServoDir.CW)
+    }
+
+    //% block="5Kg GeekServo stop pin %pin"
+    //% group="5Kg GeekServo" weight=56
+    export function geekServoStop(pin: AnalogPin): void {
+        pins.servoSetPulse(pin, 4000)
+    }
+
+
+    /********** Green GeekServo (연속회전 서보, 500~2500μs) **********/
+
+    //% block="Green GeekServo setup pin %pin"
+    //% group="Green GeekServo" weight=55
+    export function greenGeekServoSetup(pin: AnalogPin): void {
+        pins.servoSetPulse(pin, 1500)
+    }
+
+    //% block="Green GeekServo wheel pin %pin speed %speed direction %dir"
+    //% speed.min=0 speed.max=100 speed.defl=100
+    //% group="Green GeekServo" weight=54
+    //% inlineInputMode=inline
+    export function greenGeekServoWheel(pin: AnalogPin, speed: number, dir: GeekServoDir): void {
+        if (speed < 0) speed = 0
+        if (speed > 100) speed = 100
+
+        let us = 1500 // 중립 (정지)
+        if (dir == GeekServoDir.CW) {
+            us = Math.map(speed, 0, 100, 1500, 2500)
+        } else {
+            us = Math.map(speed, 0, 100, 1500, 500)
+        }
+
+        pins.servoSetPulse(pin, us)
+    }
+
+    //% block="Green GeekServo wheel pin %pin speed %speed direction %dir duration %duration ms"
+    //% speed.min=0 speed.max=100 speed.defl=100
+    //% duration.defl=1000
+    //% group="Green GeekServo" weight=53
+    //% inlineInputMode=inline
+    export function greenGeekServoWheelTimed(pin: AnalogPin, speed: number, dir: GeekServoDir, duration: number): void {
+        greenGeekServoWheel(pin, speed, dir)
+        basic.pause(duration)
+        greenGeekServoWheel(pin, 0, GeekServoDir.CW)
+    }
+
+    //% block="Green GeekServo stop pin %pin"
+    //% group="Green GeekServo" weight=52
+    export function greenGeekServoStop(pin: AnalogPin): void {
+        pins.servoSetPulse(pin, 1500)
+    }
+
+
+    /********** DC모터 드라이버 (PCA9685) **********/
+
+    // PCA9685 상태 저장
+    let _pca9685Addr: number[] = [0x40, 0x40, 0x40, 0x40]
+    let _pca9685Initialized: boolean[] = [false, false, false, false]
+
+    // PCA9685 레지스터
+    const PCA9685_MODE1 = 0x00
+    const PCA9685_PRESCALE = 0xFE
+    const PCA9685_LED0_ON_L = 0x06
+
+    // PCA9685 채널 하나에 PWM 설정
+    function pca9685SetPWM(addr: number, channel: number, on: number, off: number): void {
+        let reg = PCA9685_LED0_ON_L + 4 * channel
+        let buf = pins.createBuffer(5)
+        buf[0] = reg
+        buf[1] = on & 0xFF
+        buf[2] = (on >> 8) & 0xFF
+        buf[3] = off & 0xFF
+        buf[4] = (off >> 8) & 0xFF
+        pins.i2cWriteBuffer(addr, buf)
+    }
+
+    // PCA9685 채널에 값 설정 (0~4095)
+    function pca9685SetPin(addr: number, channel: number, value: number): void {
+        if (value >= 4095) {
+            pca9685SetPWM(addr, channel, 4096, 0)
+        } else if (value <= 0) {
+            pca9685SetPWM(addr, channel, 0, 0)
+        } else {
+            pca9685SetPWM(addr, channel, 0, value)
+        }
+    }
+
+    // PCA9685 초기화
+    function pca9685Init(addr: number): void {
+        // Reset
+        let buf = pins.createBuffer(2)
+        buf[0] = PCA9685_MODE1
+        buf[1] = 0x00
+        pins.i2cWriteBuffer(addr, buf)
+        basic.pause(5)
+
+        // Sleep mode for prescale setting
+        buf[0] = PCA9685_MODE1
+        buf[1] = 0x10 // sleep
+        pins.i2cWriteBuffer(addr, buf)
+
+        // Set prescale for ~1000Hz (for DC motor PWM)
+        // prescale = round(25MHz / (4096 * freq)) - 1
+        // for 1000Hz: round(25000000 / (4096 * 1000)) - 1 = 5
+        buf[0] = PCA9685_PRESCALE
+        buf[1] = 5
+        pins.i2cWriteBuffer(addr, buf)
+
+        // Restart
+        buf[0] = PCA9685_MODE1
+        buf[1] = 0xA0 // auto-increment + restart
+        pins.i2cWriteBuffer(addr, buf)
+        basic.pause(5)
+    }
+
+    // PCA9685 모터 정지 대상
+    export enum PCA9685StopTarget {
+        //% block="All"
+        All = 0,
+        //% block="Wheel A"
+        WheelA = 1,
+        //% block="Wheel B"
+        WheelB = 2
+    }
+
+    //% block="DC Motor Driver(PCA9685) %index I2C address %addr"
+    //% index.min=1 index.max=4 index.defl=1
+    //% addr.defl=0x40
+    //% group="DC모터 드라이버(PCA9685)" weight=50
+    //% inlineInputMode=inline
+    export function pca9685DcMotorSetup(index: number, addr: number): void {
+        let i = index - 1
+        _pca9685Addr[i] = addr
+        pca9685Init(addr)
+        _pca9685Initialized[i] = true
+    }
+
+    //% block="Motor Driver %index Wheel A direction %dir speed %speed \\%"
+    //% index.min=1 index.max=4 index.defl=1
+    //% dir.min=0 dir.max=1 dir.defl=0
+    //% speed.min=0 speed.max=100 speed.defl=50
+    //% group="DC모터 드라이버(PCA9685)" weight=49
+    //% inlineInputMode=inline
+    export function pca9685DcMotorWheelA(index: number, dir: number, speed: number): void {
+        let i = index - 1
+        let addr = _pca9685Addr[i]
+        let spd = Math.map(Math.constrain(speed, 0, 100), 0, 100, 0, 4095)
+
+        // CH0: IN1, CH1: PWM(속도), CH2: IN2
+        if (dir == 0) {
+            pca9685SetPin(addr, 0, 4095)
+            pca9685SetPin(addr, 1, spd)
+            pca9685SetPin(addr, 2, 0)
+        } else {
+            pca9685SetPin(addr, 0, 0)
+            pca9685SetPin(addr, 1, spd)
+            pca9685SetPin(addr, 2, 4095)
+        }
+    }
+
+    //% block="Motor Driver %index Wheel B direction %dir speed %speed \\%"
+    //% index.min=1 index.max=4 index.defl=1
+    //% dir.min=0 dir.max=1 dir.defl=0
+    //% speed.min=0 speed.max=100 speed.defl=50
+    //% group="DC모터 드라이버(PCA9685)" weight=48
+    //% inlineInputMode=inline
+    export function pca9685DcMotorWheelB(index: number, dir: number, speed: number): void {
+        let i = index - 1
+        let addr = _pca9685Addr[i]
+        let spd = Math.map(Math.constrain(speed, 0, 100), 0, 100, 0, 4095)
+
+        // CH3: IN1, CH4: PWM(속도), CH5: IN2 - B모터 방향 반전
+        if (dir == 0) {
+            pca9685SetPin(addr, 3, 0)
+            pca9685SetPin(addr, 4, spd)
+            pca9685SetPin(addr, 5, 4095)
+        } else {
+            pca9685SetPin(addr, 3, 4095)
+            pca9685SetPin(addr, 4, spd)
+            pca9685SetPin(addr, 5, 0)
+        }
+    }
+
+    //% block="Motor Driver %index stop %target"
+    //% index.min=1 index.max=4 index.defl=1
+    //% group="DC모터 드라이버(PCA9685)" weight=47
+    //% inlineInputMode=inline
+    export function pca9685DcMotorStop(index: number, target: PCA9685StopTarget): void {
+        let i = index - 1
+        let addr = _pca9685Addr[i]
+
+        if (target == PCA9685StopTarget.All || target == PCA9685StopTarget.WheelA) {
+            pca9685SetPin(addr, 0, 0)
+            pca9685SetPin(addr, 1, 0)
+            pca9685SetPin(addr, 2, 0)
+        }
+        if (target == PCA9685StopTarget.All || target == PCA9685StopTarget.WheelB) {
+            pca9685SetPin(addr, 3, 0)
+            pca9685SetPin(addr, 4, 0)
+            pca9685SetPin(addr, 5, 0)
+        }
+    }
+
+    //% block="Motor Driver %index Wheel A direction %dir speed %speed \\% duration %duration ms"
+    //% index.min=1 index.max=4 index.defl=1
+    //% dir.min=0 dir.max=1 dir.defl=0
+    //% speed.min=0 speed.max=100 speed.defl=50
+    //% duration.defl=1000
+    //% group="DC모터 드라이버(PCA9685)" weight=46
+    //% inlineInputMode=inline
+    export function pca9685DcMotorWheelATimed(index: number, dir: number, speed: number, duration: number): void {
+        pca9685DcMotorWheelA(index, dir, speed)
+        basic.pause(duration)
+        pca9685DcMotorStop(index, PCA9685StopTarget.WheelA)
+    }
+
+    //% block="Motor Driver %index Wheel B direction %dir speed %speed \\% duration %duration ms"
+    //% index.min=1 index.max=4 index.defl=1
+    //% dir.min=0 dir.max=1 dir.defl=0
+    //% speed.min=0 speed.max=100 speed.defl=50
+    //% duration.defl=1000
+    //% group="DC모터 드라이버(PCA9685)" weight=45
+    //% inlineInputMode=inline
+    export function pca9685DcMotorWheelBTimed(index: number, dir: number, speed: number, duration: number): void {
+        pca9685DcMotorWheelB(index, dir, speed)
+        basic.pause(duration)
+        pca9685DcMotorStop(index, PCA9685StopTarget.WheelB)
+    }
+
+
+    // 28BYJ-48, NEMA17은 위의 통합 스테퍼 시스템 사용
+
 
     /********** 1채널 릴레이 **********/
 
@@ -1176,8 +844,7 @@ namespace Actuators05 {
     //% speed.min=0 speed.max=100 speed.defl=50
     //% group="Fan모터" weight=57
     export function fanSpeed(speed: number): void {
-        let clampedSpeed = Math.constrain(speed, 0, 100)
-        pins.analogWritePin(_fanPin, clampedSpeed * 10.23)
+        pins.analogWritePin(_fanPin, speed * 10.23)
     }
 
 
